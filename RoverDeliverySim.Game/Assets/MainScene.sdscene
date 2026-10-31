@@ -13,6 +13,8 @@ Hierarchy:
         - ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
         - ref!! e8e1e927-81fb-4953-ae31-19f6c272fd1a
         - ref!! 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
+        - ref!! f01127ce-1bdd-4ff0-a197-ee3e5357817b
+        - ref!! 2d507826-7be8-46c5-afe4-6e72f38e1bfc
         - ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
         - ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
     Parts:
@@ -60,6 +62,7 @@ Hierarchy:
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
+                        NavNetwork: ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
                         TargetPosition: {X: 0.0, Y: 0.0, Z: 0.0}
                     feccb45ae0047ebd110ef237a98adc3a: !RigidbodyComponent
                         Id: a0e1f282-d754-462a-91c3-8583050d2c3d
@@ -90,7 +93,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 93005a95-d2d4-4c31-a325-11b761c5809f
-                        Position: {X: -0.3711221, Y: 0.15, Z: 0.98518854}
+                        Position: {X: 2.9759824, Y: 0.15, Z: 0.98518854}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -100,6 +103,21 @@ Hierarchy:
                         IsShadowCaster: false
                         Materials:
                             54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
+        -   Folder: null
+            Entity:
+                Id: 2d507826-7be8-46c5-afe4-6e72f38e1bfc
+                Name: House
+                Components:
+                    ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
+                        Id: f097b3d6-4351-45fd-9f5f-fc66c72b4ff8
+                        Position: {X: -3.5647194, Y: 0.0, Z: 2.6493163}
+                        Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 2.0, Y: 2.0, Z: 2.0}
+                        Children: {}
+                    efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
+                        Id: f94e9806-3f65-4fb9-89bd-61d7d51ada0c
+                        Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
+                        Materials: {}
         -   Entity:
                 Id: 46938bba-05fc-46d8-938e-3ee80d2cc5d5
                 Name: Ground
@@ -135,7 +153,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 517b1cf0-0e8f-4080-8331-f58eeda88b50
-                        Position: {X: -2.9587605, Y: 0.15, Z: 1.9363062}
+                        Position: {X: -1.7061645, Y: 0.15, Z: -2.8132713}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -165,8 +183,8 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: f26e3a55-12f8-4c31-845a-ecbf72589bc2
-                        Position: {X: -3.0, Y: 0.0, Z: 3.0}
-                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Position: {X: -3.5647194, Y: 0.0, Z: -2.8019505}
+                        Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}
                     efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
@@ -180,7 +198,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: d4259c41-8d8e-4723-be3d-536a6f7dad6d
-                        Position: {X: -2.9492815, Y: 0.15, Z: 1.0182693}
+                        Position: {X: -1.862088, Y: 0.15, Z: 1.0182693}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -196,7 +214,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 3439da35-7380-4546-93ad-d4bce9090a87
-                        Position: {X: -0.3711221, Y: 0.15, Z: 1.9363062}
+                        Position: {X: 2.9120717, Y: 0.15, Z: 2.145794}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -229,8 +247,8 @@ Hierarchy:
                 Components:
                     72d9ed7a4190b5acd05770ad5b84fb19: !TransformComponent
                         Id: 36883066-2892-431f-a3d3-1ed62c2c909d
-                        Position: {X: 4.604802, Y: 4.0426106, Z: -2.9113953}
-                        Rotation: {X: -0.09842707, Y: 0.80416477, Z: 0.18819833, W: 0.55516917}
+                        Position: {X: 6.6640034, Y: 4.0426106, Z: -0.54442215}
+                        Rotation: {X: -0.14114946, Y: 0.7273797, Z: 0.19321674, W: 0.6431666}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     441a482c7831e90753a74c30ee109f75: !CameraComponent
@@ -249,13 +267,28 @@ Hierarchy:
                 Components:
                     bb57f57e90078c7b05e62cd302338c1f: !TransformComponent
                         Id: b22f812d-25ee-4d13-951d-211a0f8d3085
-                        Position: {X: 0.0, Y: 0.0, Z: 3.0}
+                        Position: {X: 3.2107422, Y: 0.0, Z: 3.3947096}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}
                     3953b00c360313da51b413bde95e8125: !ModelComponent
                         Id: 5b560ea4-c44f-4d86-815c-a632a19ea5ee
                         Model: 2a28c0d0-8a7c-434e-93ba-47045e557e29:Models/Buildings/building-h
+                        Materials: {}
+        -   Folder: null
+            Entity:
+                Id: f01127ce-1bdd-4ff0-a197-ee3e5357817b
+                Name: House
+                Components:
+                    ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
+                        Id: fe9149ff-0d6e-456d-9d70-e1078950652d
+                        Position: {X: -3.5647194, Y: 0.0, Z: -0.0037071705}
+                        Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 2.0, Y: 2.0, Z: 2.0}
+                        Children: {}
+                    efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
+                        Id: 48d6c3f8-0c20-4a3a-b459-dc66526c2059
+                        Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
                         Materials: {}
         -   Entity:
                 Id: f240ed1e-90c9-4d88-9efe-fdfd984046ae

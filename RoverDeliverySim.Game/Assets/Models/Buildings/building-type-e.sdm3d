@@ -1,0 +1,15 @@
+!Model
+Id: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Source: !file ../../../Resources/building-type-e.glb
+Skeleton: null
+PivotPosition: {X: 0.0, Y: 0.0, Z: 0.0}
+Materials:
+    dc7856413fb05723f6463439b7a126cd:
+        Name: colormap
+        MaterialInstance:
+            Material: c2e44656-d803-4dd2-908e-b079397d1aa3:Models/Materials/Building
+Modifiers: {}
+~SourceHashes:
+    3737ed61f327837c2863dfdf908b9225~../../../Resources/building-type-e.glb: cf2055e518b0083041371c8539a83a1b

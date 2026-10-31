@@ -1,0 +1,185 @@
+!SceneAsset
+Id: d2473ede-8ab2-4bb3-ab66-53b7eae39988
+SerializedVersion: {Stride: 3.1.0.1}
+Tags: []
+ChildrenIds: []
+Offset: {X: 0.0, Y: 0.0, Z: 0.0}
+Hierarchy:
+    RootParts:
+        - ref!! 0353d0ee-edb8-4066-9d71-b77cb03135aa
+        - ref!! af112fa1-94b6-47b1-ad49-9eb0ca1fd288
+        - ref!! bcdec293-0c01-4bbf-87dd-f8bf083617a1
+        - ref!! 46938bba-05fc-46d8-938e-3ee80d2cc5d5
+        - ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
+        - ref!! e8e1e927-81fb-4953-ae31-19f6c272fd1a
+        - ref!! 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
+    Parts:
+        -   Entity:
+                Id: 0353d0ee-edb8-4066-9d71-b77cb03135aa
+                Name: Directional light
+                Components:
+                    a3294146fd186c7e2c4ba3f89c23bda9: !TransformComponent
+                        Id: f7dec451-ab07-4506-8977-65e7d2bca1c7
+                        Position: {X: 0.0, Y: 2.0, Z: 0.0}
+                        Rotation: {X: 1.131334E-08, Y: -0.9659258, Z: -0.25881904, W: -4.222196E-08}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
+                    1392ba253a6ff62041052ab2bd43f031: !LightComponent
+                        Id: 8e0c041e-0b65-4a8c-a3b9-f93bc64cdd7e
+                        Type: !LightDirectional
+                            Color: !ColorRgbProvider
+                                Value: {R: 1.0, G: 1.0, B: 1.0}
+                            Shadow:
+                                Enabled: true
+                                Filter: !LightShadowMapFilterTypePcf
+                                    FilterSize: Filter5x5
+                                Size: Large
+                                DepthRange: {}
+                                PartitionMode: !LightDirectionalShadowMap.PartitionLogarithmic {}
+                                ComputeTransmittance: false
+                                BiasParameters: {}
+                        Intensity: 20.0
+        -   Entity:
+                Id: 125e521d-89dc-4bbb-aa8f-228fc185d6f8
+                Name: Rover
+                Components:
+                    c3625580c758a0979dc5849cce44bc3b: !TransformComponent
+                        Id: 3e81b89a-2791-4176-ad17-a7af5e125732
+                        Position: {X: 0.0, Y: 0.01, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children:
+                            a9ad407cb0d60d6c5254a42dfa82276f: ref!! 8991e41d-7d83-40c5-9e47-ce92f89637f8
+                    501ccab78f535cc679dc693bd01f98d4: !ModelComponent
+                        Id: ae569d9f-fc04-4746-a3a8-a0ab4ca9f556
+                        Model: 8f8ee9bf-c8a2-4630-93f1-e48ad84e9647:Models/Rover
+                        Materials: {}
+                    b2e494f7b4c17851630d05f04ec1e758: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
+                        Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
+                        MoveSpeed: 3.0
+                        TurnSpeed: 3.0
+                    feccb45ae0047ebd110ef237a98adc3a: !RigidbodyComponent
+                        Id: a0e1f282-d754-462a-91c3-8583050d2c3d
+                        CanSleep: false
+                        Restitution: 0.0
+                        Friction: 0.5
+                        RollingFriction: 0.0
+                        CcdMotionThreshold: 0.0
+                        CcdSweptSphereRadius: 0.0
+                        IsTrigger: false
+                        IsKinematic: false
+                        Mass: 1.0
+                        LinearDamping: 0.0
+                        AngularDamping: 0.0
+                        OverrideGravity: false
+                        Gravity: {X: 0.0, Y: 0.0, Z: 0.0}
+                        NodeName: null
+                        ColliderShapes:
+                            4995d387a8d3e0f98a8f33ea0fd7ca3a: !CapsuleColliderShapeDesc
+                                Length: 0.3
+                                Radius: 0.15
+                                LocalOffset: {X: 0.0, Y: 0.15, Z: 0.0}
+                                LocalRotation: {X: 0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
+        -   Entity:
+                Id: 46938bba-05fc-46d8-938e-3ee80d2cc5d5
+                Name: Ground
+                Components:
+                    d5c7ca36f804083db3f15ac9ab641c02: !TransformComponent
+                        Id: 567ea7cd-968f-4be2-aa13-1adc2b743d24
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
+                    deb336a23085d13904bc8d091ff606d6: !ModelComponent
+                        Id: 6878b5e1-0b12-4067-b184-955e2ff3d4b3
+                        Model: 826e45fa-9261-4e1f-8401-d2d05cebf8ad:Models/Ground
+                        Materials: {}
+                    bccb10cb6e7c87698ccd58ee9d577523: !StaticColliderComponent
+                        Id: 8cfda7ab-f903-4f88-949c-7fddff195177
+                        CanSleep: false
+                        Restitution: 0.0
+                        Friction: 0.5
+                        RollingFriction: 0.0
+                        CcdMotionThreshold: 0.0
+                        CcdSweptSphereRadius: 0.0
+                        IsTrigger: false
+                        AlwaysUpdateNaviMeshCache: false
+                        ColliderShapes:
+                            92310c4db83afb4b214f0b9be35fffaf: !StaticPlaneColliderShapeDesc
+                                Normal: {X: 0.0, Y: 1.0, Z: 0.0}
+                                Offset: 0.0
+        -   Entity:
+                Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
+                Name: building-type-e
+                Components:
+                    ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
+                        Id: f26e3a55-12f8-4c31-845a-ecbf72589bc2
+                        Position: {X: -3.0, Y: 0.0, Z: 3.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 2.0, Y: 2.0, Z: 2.0}
+                        Children: {}
+                    efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
+                        Id: 59ea7302-1ddb-4954-926c-530cea8038b8
+                        Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
+                        Materials: {}
+        -   Entity:
+                Id: af112fa1-94b6-47b1-ad49-9eb0ca1fd288
+                Name: Skybox
+                Components:
+                    206c788bf63948dea65f1aa997f4c95f: !TransformComponent
+                        Id: 205d61a4-c5cc-4ff4-8f9b-6c411a2d7264
+                        Position: {X: 0.0, Y: 2.0, Z: -2.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
+                    50ab9d07393b0d80a6cff9ffb3104e4a: !BackgroundComponent
+                        Id: 17aa208e-7644-48bf-8358-9def6530d73f
+                        Texture: 1e6e589e-ce47-4441-a99c-c42954f37ff8:Models/Textures/Skybox texture
+                    5733ca1e623fcf399f389e2b0e7c54ec: !LightComponent
+                        Id: 783c635b-e916-4806-87d0-5d804d780822
+                        Type: !LightSkybox
+                            Skybox: 92526c2c-04fb-4323-b795-b9644067199b:Skybox
+        -   Entity:
+                Id: bcdec293-0c01-4bbf-87dd-f8bf083617a1
+                Name: MainCamera
+                Components:
+                    72d9ed7a4190b5acd05770ad5b84fb19: !TransformComponent
+                        Id: 36883066-2892-431f-a3d3-1ed62c2c909d
+                        Position: {X: 4.604802, Y: 4.0426106, Z: -2.9113953}
+                        Rotation: {X: -0.09842707, Y: 0.80416477, Z: 0.18819833, W: 0.55516917}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
+                    441a482c7831e90753a74c30ee109f75: !CameraComponent
+                        Id: 82702b9c-edcd-4e99-943b-0dd2bfdcbb0e
+                        Name: null
+                        Projection: Perspective
+                        Slot: 2a651fd0-7ab3-43f0-8de2-d478e7229652
+        -   Entity:
+                Id: e8e1e927-81fb-4953-ae31-19f6c272fd1a
+                Name: building-h
+                Components:
+                    bb57f57e90078c7b05e62cd302338c1f: !TransformComponent
+                        Id: b22f812d-25ee-4d13-951d-211a0f8d3085
+                        Position: {X: 0.0, Y: 0.0, Z: 3.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 2.0, Y: 2.0, Z: 2.0}
+                        Children: {}
+                    3953b00c360313da51b413bde95e8125: !ModelComponent
+                        Id: 5b560ea4-c44f-4d86-815c-a632a19ea5ee
+                        Model: 2a28c0d0-8a7c-434e-93ba-47045e557e29:Models/Buildings/building-h
+                        Materials: {}
+        -   Entity:
+                Id: f240ed1e-90c9-4d88-9efe-fdfd984046ae
+                Name: ColliderVisualization
+                Components:
+                    95ff8b9b1625bce73dc8bca3838918c7: !TransformComponent
+                        Id: 8991e41d-7d83-40c5-9e47-ce92f89637f8
+                        Position: {X: 0.0, Y: 0.15, Z: 0.0}
+                        Rotation: {X: 0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 0.3, Y: 0.3, Z: 0.3}
+                        Children: {}
+                    e8a90b6be3545b5b304d7be2f61b9553: !ModelComponent
+                        Id: 640ed767-5818-4842-86b7-ea836eb2912e
+                        Enabled: false
+                        Model: c312193d-69e8-4f4a-b080-e8210c47b0f8:Models/Buildings/Capsule
+                        Materials: {}

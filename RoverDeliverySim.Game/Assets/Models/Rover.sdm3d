@@ -1,0 +1,27 @@
+!Model
+Id: 8f8ee9bf-c8a2-4630-93f1-e48ad84e9647
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Source: !file ../../Resources/rover.glb
+Skeleton: null
+PivotPosition: {X: 0.0, Y: 0.0, Z: 0.0}
+Materials:
+    d0a0dedcb9a92755e92b7a6ff79cfe41:
+        Name: dark
+        MaterialInstance:
+            Material: 718d4fee-aa0a-479d-bd51-5a13a1a7dac7:Models/Materials/dark
+    a9ed605c9757ca7671052e2a33f23209:
+        Name: metal
+        MaterialInstance:
+            Material: dcb1d9f6-e2ae-4d72-8531-e0e105a7b175:Models/Materials/metal
+    6ca91e006a011dfe139c133813eac9ef:
+        Name: metalRed
+        MaterialInstance:
+            Material: 6b514ec2-eab6-48d9-8587-342a9d6556ec:Models/Materials/metalRed
+    d147f6a9308881fa1960de941c2816ec:
+        Name: metalDark
+        MaterialInstance:
+            Material: 8494f855-9d1f-4525-a8da-4e6da59b3f61:Models/Materials/metalDark
+Modifiers: {}
+~SourceHashes:
+    27865df91a28f867d5feecef846b22f2~../../Resources/rover.glb: 6d033c0a300ebc224b13176fdd75cf4c

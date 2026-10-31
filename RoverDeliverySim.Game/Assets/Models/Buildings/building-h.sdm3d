@@ -1,0 +1,15 @@
+!Model
+Id: 2a28c0d0-8a7c-434e-93ba-47045e557e29
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Source: !file ../../../Resources/building-h.glb
+Skeleton: null
+PivotPosition: {X: 0.0, Y: 0.0, Z: 0.0}
+Materials:
+    ebd74b58d3bd8c699b32b0201e32d7ac:
+        Name: colormap
+        MaterialInstance:
+            Material: c2e44656-d803-4dd2-908e-b079397d1aa3:Models/Materials/Building
+Modifiers: {}
+~SourceHashes:
+    4a141aa6ed7e8f85cca4de289f95f742~../../../Resources/building-h.glb: b6f24f019b6024cd8615eb480be99799

@@ -13,6 +13,8 @@ Hierarchy:
         - ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
         - ref!! e8e1e927-81fb-4953-ae31-19f6c272fd1a
         - ref!! 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
+        - ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
+        - ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
     Parts:
         -   Entity:
                 Id: 0353d0ee-edb8-4066-9d71-b77cb03135aa
@@ -38,7 +40,7 @@ Hierarchy:
                                 PartitionMode: !LightDirectionalShadowMap.PartitionLogarithmic {}
                                 ComputeTransmittance: false
                                 BiasParameters: {}
-                        Intensity: 20.0
+                        Intensity: 4.0
         -   Entity:
                 Id: 125e521d-89dc-4bbb-aa8f-228fc185d6f8
                 Name: Rover
@@ -58,6 +60,7 @@ Hierarchy:
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
+                        TargetPosition: {X: 0.0, Y: 0.0, Z: 0.0}
                     feccb45ae0047ebd110ef237a98adc3a: !RigidbodyComponent
                         Id: a0e1f282-d754-462a-91c3-8583050d2c3d
                         CanSleep: false
@@ -80,6 +83,23 @@ Hierarchy:
                                 Radius: 0.15
                                 LocalOffset: {X: 0.0, Y: 0.15, Z: 0.0}
                                 LocalRotation: {X: 0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
+        -   Folder: null
+            Entity:
+                Id: 192d4ba6-afe0-4940-ab85-4ac1eb492c3e
+                Name: NavPoint2
+                Components:
+                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
+                        Id: 93005a95-d2d4-4c31-a325-11b761c5809f
+                        Position: {X: -0.3711221, Y: 0.15, Z: 0.98518854}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 0.25, Y: 0.25, Z: 0.25}
+                        Children: {}
+                    21a8309fd43a197b092213e8c068984c: !ModelComponent
+                        Id: adc5df17-648b-4ccf-b8de-b9d72140331a
+                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
+                        IsShadowCaster: false
+                        Materials:
+                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
         -   Entity:
                 Id: 46938bba-05fc-46d8-938e-3ee80d2cc5d5
                 Name: Ground
@@ -108,9 +128,40 @@ Hierarchy:
                             92310c4db83afb4b214f0b9be35fffaf: !StaticPlaneColliderShapeDesc
                                 Normal: {X: 0.0, Y: 1.0, Z: 0.0}
                                 Offset: 0.0
+        -   Folder: null
+            Entity:
+                Id: 48d81066-8679-41c0-bb7c-576d1c0e4702
+                Name: NavPoint4
+                Components:
+                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
+                        Id: 517b1cf0-0e8f-4080-8331-f58eeda88b50
+                        Position: {X: -2.9587605, Y: 0.15, Z: 1.9363062}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 0.25, Y: 0.25, Z: 0.25}
+                        Children: {}
+                    21a8309fd43a197b092213e8c068984c: !ModelComponent
+                        Id: b64a19ab-b9d3-4c8c-8afe-002d6266cae4
+                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
+                        IsShadowCaster: false
+                        Materials:
+                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
+        -   Entity:
+                Id: 507b2137-ed8b-4a41-9d04-cf93bd62f29e
+                Name: NavNetwork
+                Components:
+                    c28e4ba60f82515a13cb49c1c3d4a498: !TransformComponent
+                        Id: 2230b9c0-df68-4fb2-873d-dccf6beaf9df
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children:
+                            b6aea4526773a2eb04da57403f24f403: ref!! 3439da35-7380-4546-93ad-d4bce9090a87
+                            e341da901005e49e7108f03895aa4fbc: ref!! 93005a95-d2d4-4c31-a325-11b761c5809f
+                            494fdb057b50112a3a07d60c8acc59d0: ref!! d4259c41-8d8e-4723-be3d-536a6f7dad6d
+                            35ca93934679d7ddf9ee85661d85f344: ref!! 517b1cf0-0e8f-4080-8331-f58eeda88b50
         -   Entity:
                 Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
-                Name: building-type-e
+                Name: House
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: f26e3a55-12f8-4c31-845a-ecbf72589bc2
@@ -122,6 +173,39 @@ Hierarchy:
                         Id: 59ea7302-1ddb-4954-926c-530cea8038b8
                         Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
                         Materials: {}
+        -   Folder: null
+            Entity:
+                Id: 81443f9d-1ac8-4652-acb8-72440edb4a10
+                Name: NavPoint3
+                Components:
+                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
+                        Id: d4259c41-8d8e-4723-be3d-536a6f7dad6d
+                        Position: {X: -2.9492815, Y: 0.15, Z: 1.0182693}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 0.25, Y: 0.25, Z: 0.25}
+                        Children: {}
+                    21a8309fd43a197b092213e8c068984c: !ModelComponent
+                        Id: f03fdb08-cbcf-4af7-a4ea-21d0e59c6660
+                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
+                        IsShadowCaster: false
+                        Materials:
+                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
+        -   Entity:
+                Id: 96113b1a-feae-4e46-a4f8-a7d69fa37243
+                Name: NavPoint1
+                Components:
+                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
+                        Id: 3439da35-7380-4546-93ad-d4bce9090a87
+                        Position: {X: -0.3711221, Y: 0.15, Z: 1.9363062}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 0.25, Y: 0.25, Z: 0.25}
+                        Children: {}
+                    21a8309fd43a197b092213e8c068984c: !ModelComponent
+                        Id: 0fd98d2a-a6e1-4c31-901e-b6c8dd7613bd
+                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
+                        IsShadowCaster: false
+                        Materials:
+                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
         -   Entity:
                 Id: af112fa1-94b6-47b1-ad49-9eb0ca1fd288
                 Name: Skybox
@@ -154,9 +238,14 @@ Hierarchy:
                         Name: null
                         Projection: Perspective
                         Slot: 2a651fd0-7ab3-43f0-8de2-d478e7229652
+                    188b985edffde6d3ab08ae635c109d3e: !RoverDeliverySim.GroundClicker,RoverDeliverySim.Game
+                        Id: 3032e2b1-26a8-461e-afce-bbe5427df5b1
+                        Camera: ref!! 82702b9c-edcd-4e99-943b-0dd2bfdcbb0e
+                        MouseClickSphere: ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
+                        Rover: ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
         -   Entity:
                 Id: e8e1e927-81fb-4953-ae31-19f6c272fd1a
-                Name: building-h
+                Name: Pharmacy
                 Components:
                     bb57f57e90078c7b05e62cd302338c1f: !TransformComponent
                         Id: b22f812d-25ee-4d13-951d-211a0f8d3085
@@ -183,3 +272,20 @@ Hierarchy:
                         Enabled: false
                         Model: c312193d-69e8-4f4a-b080-e8210c47b0f8:Models/Buildings/Capsule
                         Materials: {}
+        -   Entity:
+                Id: fac5244a-aa86-4c83-897a-ab1e895ab459
+                Name: Click
+                Components:
+                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
+                        Id: 772b857e-ee68-43ea-a050-29e2dd6a3749
+                        Position: {X: -0.96341634, Y: 0.2, Z: -1.2298137}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 0.5, Y: 0.5, Z: 0.5}
+                        Children: {}
+                    21a8309fd43a197b092213e8c068984c: !ModelComponent
+                        Id: 0968c93c-5c90-45aa-990c-ca42fe1f5d29
+                        Enabled: false
+                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
+                        IsShadowCaster: false
+                        Materials:
+                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: 25bc43b8-6ebe-48c7-9d7a-43d9a206d0a0:Models/Materials/ClickPointMaterial

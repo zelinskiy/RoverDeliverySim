@@ -1,0 +1,13 @@
+!MaterialAsset
+Id: 25bc43b8-6ebe-48c7-9d7a-43d9a206d0a0
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Attributes:
+    Emissive: !MaterialEmissiveMapFeature
+        EmissiveMap: !ComputeColor
+            Value: {R: 1.0, G: 0.0, B: 0.0, A: 1.0}
+        Intensity: !ComputeFloat
+            Value: 3.0
+    Overrides:
+        UVScale: {X: 1.0, Y: 1.0}
+Layers: {}

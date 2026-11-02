@@ -4,6 +4,7 @@
     <RootNamespace>RoverDeliverySim</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Asv.Mavlink" Version="4.4.4" />
     <PackageReference Include="Stride.Engine" Version="4.4.1" />
     <PackageReference Include="Stride.Video" Version="4.4.1" />
     <PackageReference Include="Stride.Physics" Version="4.4.1" />

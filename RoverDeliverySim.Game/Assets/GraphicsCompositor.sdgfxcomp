@@ -7,6 +7,9 @@ Cameras:
     de2e75c3b2b23e54162686363f3f138e:
         Id: 2a651fd0-7ab3-43f0-8de2-d478e7229652
         Name: Main
+    1cd5d11a5b07ffce04bdec2ac58653aa*:
+        Id: aa64ca60-45ba-479a-9a64-0944ddf82284
+        Name: MapView
 RenderStages:
     47116750c1a5d449b4ad3625f71439b3:
         Id: df5b5560-5b18-457e-a450-c654b9babd12
@@ -38,6 +41,14 @@ RenderStages:
         Name: GBuffer
         EffectSlotName: GBuffer
         SortMode: !FrontToBackSortMode {}
+    cd61493397c7d2625d597570b7db364d*:
+        Id: 748e2af2-5d18-4eb9-9ba4-83652e97ced4
+        Name: RenderStage
+        EffectSlotName: Main
+    61d56213c7ab34293af11cb81eb1a2df*:
+        Id: 3cc85721-f4e4-4747-8408-c15c77237664
+        Name: RenderStage
+        EffectSlotName: Main
 RenderFeatures:
     d8fb80b0e7995140a46bca8dc36ee8a2: !Stride.Rendering.MeshRenderFeature,Stride.Rendering
         RenderStageSelectors:
@@ -211,8 +222,18 @@ Game: !Stride.Rendering.Compositing.SceneCameraRenderer,Stride.Engine
     Child: !Stride.Rendering.Compositing.SceneRendererCollection,Stride.Rendering
         Id: 15d43802-e813-4590-882e-1cb86788f2c5
         Children:
-            d39c5ddbf8b7d5ca02bafb6496b1cc3c: !Stride.Rendering.Compositing.ForwardRenderer,Stride.Engine ref!! 7c5bbbf7-5b6e-4a45-8759-9fb39343791b
-            01d338078e9b21121ead0868932613dd: !Stride.Rendering.Compositing.DebugRenderer,Stride.Rendering ref!! 8ee306ed-c9d3-4231-8c44-60347abd9dba
+            04122af95ece312a0000f86b1aab066e*: !Stride.Rendering.Compositing.RenderTextureSceneRenderer,Stride.Rendering
+                Id: 96f76729-8623-4b1a-ae24-eee046876700
+                RenderTexture: 1fee69ba-f503-440f-b6d0-863fead3d063:Models/Textures/MapRenderTexture
+                Child: !Stride.Rendering.Compositing.SceneCameraRenderer,Stride.Engine
+                    Id: 92a0c1b3-49bd-4678-9afe-f46bfc126aed
+                    Camera: ref!! aa64ca60-45ba-479a-9a64-0944ddf82284
+                    Child: !Stride.Rendering.Compositing.ForwardRenderer,Stride.Engine ref!! 1e9fcca1-d51e-4f74-94ea-cbf1bed9c865
+                    RenderMask: All
+            6bfb66393ff096bb250849c8abb1f3f5*: !Stride.Rendering.Compositing.ForwardRenderer,Stride.Engine ref!! 7c5bbbf7-5b6e-4a45-8759-9fb39343791b
+            c184a8f93954b6aa2268b575bbf0ba96*: !Stride.Rendering.Compositing.DebugRenderer,Stride.Rendering ref!! 8ee306ed-c9d3-4231-8c44-60347abd9dba
+            01d338078e9b21121ead0868932613dd: ~(Deleted)
+            d39c5ddbf8b7d5ca02bafb6496b1cc3c: ~(Deleted)
     RenderMask: All
 SingleView: !Stride.Rendering.Compositing.ForwardRenderer,Stride.Engine ref!! 1e9fcca1-d51e-4f74-94ea-cbf1bed9c865
 Editor: !Stride.Rendering.Compositing.ForwardRenderer,Stride.Engine ref!! 7c5bbbf7-5b6e-4a45-8759-9fb39343791b

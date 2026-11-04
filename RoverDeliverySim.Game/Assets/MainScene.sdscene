@@ -87,10 +87,12 @@ Hierarchy:
                                 Radius: 0.15
                                 LocalOffset: {X: 0.0, Y: 0.15, Z: 0.0}
                                 LocalRotation: {X: 0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
-                    626f6040ba7083f19dd660ed29fd0666: !RoverDeliverySim.RoverMavLinkConnection,RoverDeliverySim.Game
-                        Id: b1d39e60-37dd-4a44-aea3-9b87394cb275
-                        Port: 14550
-                        Host: 127.0.0.1
+                    590bb1cc72dde64488558361be68b096: !RoverDeliverySim.RoverMavLinkConnection,RoverDeliverySim.Game
+                        Id: 0b30d2a0-dd8d-4e97-a990-b8a4121556f9
+                        RemotePort: 14550
+                        RemoteHost: 127.0.0.1
+                        LocalPort: 14560
+                        LocalHost: 127.0.0.1
         -   Folder: null
             Entity:
                 Id: 192d4ba6-afe0-4940-ab85-4ac1eb492c3e

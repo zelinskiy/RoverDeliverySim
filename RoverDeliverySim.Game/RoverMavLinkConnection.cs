@@ -3,15 +3,17 @@ using Asv.IO;
 using Asv.Mavlink;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Minimal;
+using DotNext;
 using DotNext.Threading;
+using Newtonsoft.Json.Linq;
 using R3;
+using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Physics;
-using Stride.Core.Mathematics;
 using System;
 using System.Threading;
 using System.Threading.Tasks;
-using DotNext;
+using System.Xml.Linq;
 
 namespace RoverDeliverySim;
 
@@ -26,6 +28,15 @@ public class RoverMavLinkConnection : AsyncScript
     private CancellationTokenSource _cts;
     private IProtocolRouter _router;
     private MavlinkIdentity _mavlinkId = new MavlinkIdentity(1, 1);
+
+    private static readonly (string, float, MavParamType)[] MAVLINK_PARAMETERS = 
+    [
+        ("SYSID_THISMAV", 1f,    MavParamType.MavParamTypeUint8),
+        ("FRAME_CLASS",   1f,    MavParamType.MavParamTypeUint8),
+        ("ARMING_CHECK",  1f,    MavParamType.MavParamTypeInt32),
+        ("CRUISE_SPEED",  2f,    MavParamType.MavParamTypeReal32),
+        ("WP_RADIUS",     2f,    MavParamType.MavParamTypeReal32),
+    ];
 
     public override async Task Execute()
     {
@@ -112,16 +123,31 @@ public class RoverMavLinkConnection : AsyncScript
         using var readSubscription = paramsService.OnParamRequestRead.Subscribe(request =>
         {
             var name = MavlinkTypesHelper.GetString(request.Payload.ParamId);
-            Console.WriteLine($"Parameter read requested: {name}");
+            Log.Info($"Parameter read requested: {name}");
         });
-        using var listSubscription = paramsService.OnParamRequestList.Subscribe(request =>
+        using var listSubscription = paramsService.OnParamRequestList.Subscribe(async req =>
         {
-            Console.WriteLine("Parameter list requested");
+            Log.Info("Parameter list requested");
+            for (ushort i = 0; i<MAVLINK_PARAMETERS.Length; i++)
+            {                
+                await paramsService.SendParamValue(p =>
+                {
+                    var (name, value, type) = MAVLINK_PARAMETERS[i];
+                    MavlinkTypesHelper.SetString(p.ParamId, name);
+                    p.ParamValue = value;
+                    p.ParamType = type;
+                    p.ParamCount = (ushort)MAVLINK_PARAMETERS.Length;
+                    p.ParamIndex = i;
+                    Log.Info($"Sending {name}={value}");
+                });
+                await Task.Delay(10);
+            }
+            
         });
         using var setSubscription = paramsService.OnParamSet.Subscribe(packet =>
         {
             var name = MavlinkTypesHelper.GetString(packet.Payload.ParamId);
-            Console.WriteLine($"Parameter set: {name} = {packet.Payload.ParamValue}");
+            Log.Info($"Parameter set: {name} = {packet.Payload.ParamValue}");
         });
         await paramsService.Init(_cts.Token);
         paramsService.Start();
@@ -156,6 +182,7 @@ public class RoverMavLinkConnection : AsyncScript
             Log.Info("[MAVLink] Set home called");
             return CommandResult.AcceptedTask;
         };
+        //commandLongService.
 
         //var commandIntService = _serverDevice.GetCommandIntEx();
         //commandIntService[MavCmd.MavCmdGetHomePosition] = (id, packet, ct) =>
@@ -186,12 +213,11 @@ public class RoverMavLinkConnection : AsyncScript
 
     private async Task SendLocalPosition()
     {
-        byte seq = _serverDevice.Context.Sequence.GetNextSequenceNumber();
         var packet = new LocalPositionNedPacket()
         {
-            SystemId = 1,
-            ComponentId = 1,
-            Sequence = seq,
+            SystemId = _mavlinkId.SystemId,
+            ComponentId = _mavlinkId.ComponentId,
+            Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber(),
         };
 
         var pos = Entity.Transform.Position;
@@ -210,18 +236,18 @@ public class RoverMavLinkConnection : AsyncScript
 
     private async Task SendGlobalPosition()
     {
-        byte seq = _serverDevice.Context.Sequence.GetNextSequenceNumber();
-        //var packet = new GlobalPositionIntPacket()
-        //{
-        //    SystemId = 1,
-        //    ComponentId = 1,
-        //    Sequence = seq,
-        //};
+        var packet = new GlobalPositionIntPacket()
+        {
+            SystemId = _mavlinkId.SystemId,
+            ComponentId = _mavlinkId.ComponentId,
+            Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber(),
+        };
 
-        var packet = (GlobalPositionIntPacket)_serverDevice.Context.MessageFactory.Create(GlobalPositionIntPacket.MessageId);
+        // TODO: This should set seq, etc.? But not doing it. What's the point then?
+        //var packet = _serverDevice.Context.MessageFactory.Create(GlobalPositionIntPacket.MessageId);
 
         var pos = Entity.Transform.Position;
-        var payload = packet.Payload;
+        var payload = (GlobalPositionIntPayload)packet.GetPayload();
         payload.Lat = 511079000 + (int)(pos.Z * 100);
         payload.Lon = 170385000 + (int)(pos.X * 100);
         payload.Alt = 118000 + (int)(-pos.Y * 1000);

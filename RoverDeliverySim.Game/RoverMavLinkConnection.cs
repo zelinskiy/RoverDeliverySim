@@ -3,6 +3,7 @@ using Asv.IO;
 using Asv.Mavlink;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Minimal;
+using BulletSharp.SoftBody;
 using DotNext;
 using DotNext.Threading;
 using Newtonsoft.Json.Linq;
@@ -14,6 +15,7 @@ using System;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using static Stride.Graphics.Buffer;
 
 namespace RoverDeliverySim;
 
@@ -198,11 +200,12 @@ public class RoverMavLinkConnection : AsyncScript
             float deltaTime = (float)Game.UpdateTime.Elapsed.TotalSeconds;            
 
             positionTimer += deltaTime;
-            if (positionTimer >= 2f)
+            if (positionTimer >= 0.1f)
             {
                 positionTimer = 0f;
-                await SendLocalPosition();
+                //await SendLocalPosition();
                 await SendGlobalPosition();
+                await SendAttitude();
             }
             await Script.NextFrame();
         }
@@ -211,62 +214,98 @@ public class RoverMavLinkConnection : AsyncScript
         //_router.Dispose(); TBD ???
     }
 
+    private TPacket createPacket<TPacket, TPayload>(
+        Action<TPayload, TransformComponent, RigidbodyComponent> packer)
+        where TPacket : MavlinkV2Message<TPayload>, new()
+        where TPayload : IPayload
+    {
+        // TODO: This should set seq, etc.? But not doing it. What's the point then?
+        //var packet = _serverDevice.Context.MessageFactory.Create(GlobalPositionIntPacket.MessageId);
+        //var payload = (GlobalPositionIntPayload)packet.GetPayload();
+
+        var packet = new TPacket();
+        packet.SystemId = _mavlinkId.SystemId;
+        packet.ComponentId = _mavlinkId.ComponentId;
+        packet.Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber();
+
+        var t = Entity.Transform;
+        var rb = Entity.Get<RigidbodyComponent>();
+        var payload = (TPayload)packet.GetPayload();
+        packer(payload, t, rb);
+
+        // Hold on with metaprogramming black magic here due to possible performance impact
+        //payload.VisitFields((s, ft) => { 
+        //    if(ft.Name == "TimeBootMs")
+        //    {
+        //        var f = s.Peek();
+        //        var prop = f.GetType().GetProperty(ft.Name);
+        //        prop.SetValue(f, (uint)Game.UpdateTime.Total.TotalMilliseconds);
+        //    }
+        //});
+
+        return packet;
+    }
+
     private async Task SendLocalPosition()
     {
-        var packet = new LocalPositionNedPacket()
+        var packet = createPacket<LocalPositionNedPacket, LocalPositionNedPayload>((payload, t, rb) =>
         {
-            SystemId = _mavlinkId.SystemId,
-            ComponentId = _mavlinkId.ComponentId,
-            Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber(),
-        };
-
-        var pos = Entity.Transform.Position;
-        packet.Payload.X = pos.X;
-        packet.Payload.Y = pos.Y;
-        packet.Payload.Z = pos.Z;
-
-        var rigidBody = Entity.Get<RigidbodyComponent>();
-        var vel = rigidBody.LinearVelocity;
-        packet.Payload.Vx = vel.Z;
-        packet.Payload.Vy = vel.X;
-        packet.Payload.Vz = (-1) * vel.Y;
-
+            payload.X = t.Position.X;
+            payload.Y = t.Position.Y;
+            payload.Z = t.Position.Z;
+            var v = rb.LinearVelocity;
+            payload.Vx = v.Z;
+            payload.Vy = v.X;
+            payload.Vz = (-1) * v.Y;
+            payload.TimeBootMs = (uint)Game.UpdateTime.Total.TotalMilliseconds;
+        });
         await _router.Send(packet);
     }
 
     private async Task SendGlobalPosition()
     {
-        var packet = new GlobalPositionIntPacket()
+        var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
-            SystemId = _mavlinkId.SystemId,
-            ComponentId = _mavlinkId.ComponentId,
-            Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber(),
-        };
+            var pos = t.Position;
+            payload.Lat = 511079000 + (int)(pos.Z * 100);
+            payload.Lon = 170385000 + (int)(pos.X * 100);
+            payload.Alt = 118000 + (int)(-pos.Y * 1000);
+            payload.RelativeAlt = payload.Alt;
 
-        // TODO: This should set seq, etc.? But not doing it. What's the point then?
-        //var packet = _serverDevice.Context.MessageFactory.Create(GlobalPositionIntPacket.MessageId);
+            var v = rb.LinearVelocity;
+            payload.Vx = (short)(v.Z * 100);
+            payload.Vy = (short)(v.X * 100);
+            payload.Vz = (short)(-v.Y * 100);
 
-        var pos = Entity.Transform.Position;
-        var payload = (GlobalPositionIntPayload)packet.GetPayload();
-        payload.Lat = 511079000 + (int)(pos.Z * 100);
-        payload.Lon = 170385000 + (int)(pos.X * 100);
-        payload.Alt = 118000 + (int)(-pos.Y * 1000);
-        payload.RelativeAlt = payload.Alt;
+            var forward = t.WorldMatrix.Forward;
+            float theta = (float)Math.Atan2(forward.X, -forward.Z);
+            float hdg = MathUtil.RadiansToDegrees(theta);
+            hdg = (hdg % 360f + 360f) % 360f;
+            payload.Hdg = (ushort)Math.Min(hdg * 100f, 35999f);
 
-        var rigidBody = Entity.Get<RigidbodyComponent>();
-        var vel = rigidBody.LinearVelocity;
-        payload.Vx = (short)(vel.Z * 100);
-        payload.Vy = (short)(vel.X * 100);
-        payload.Vz = (short)(-vel.Y * 100);
+            payload.TimeBootMs = (uint)Game.UpdateTime.Total.TotalMilliseconds;
+        });
+        await _router.Send(packet);
+    }
 
-        var forward = Entity.Transform.WorldMatrix.Forward;
-        float theta = (float)Math.Atan2(-forward.X, -forward.Z);
-        float hdg = MathUtil.RadiansToDegrees(theta);
-        if (hdg < 0f) hdg += 360f;
-        payload.Hdg = (ushort)(hdg * 100f); ;
+    private async Task SendAttitude()
+    {
+        var packet = createPacket<AttitudePacket, AttitudePayload>((payload, t, rb) => {
+            var wm = t.WorldMatrix;
+            var f = Vector3.Normalize(wm.Forward);
+            var r = Vector3.Normalize(wm.Right);
+            var u = Vector3.Normalize(wm.Up);
+            payload.Yaw = MathF.Atan2(f.X, f.Z);
+            payload.Pitch = MathF.Asin(Math.Clamp(f.Y, -1f, 1f));
+            payload.Roll = MathF.Atan2(-r.Y, u.Y);
 
-        payload.TimeBootMs = (uint)(Game.UpdateTime.Total.TotalMilliseconds % uint.MaxValue);
-        
+            var w = rb.AngularVelocity;
+            payload.Yawspeed = Vector3.Dot(w, u);
+            payload.Pitchspeed = Vector3.Dot(w, r);
+            payload.Rollspeed = Vector3.Dot(w, f);
+
+            payload.TimeBootMs = (uint)Game.UpdateTime.Total.TotalMilliseconds;
+        });
         await _router.Send(packet);
     }
 }

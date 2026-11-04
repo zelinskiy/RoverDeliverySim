@@ -100,7 +100,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 93005a95-d2d4-4c31-a325-11b761c5809f
-                        Position: {X: 2.9759824, Y: 0.15, Z: 0.98518854}
+                        Position: {X: 2.2943282, Y: 0.15, Z: -7.3598614}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -117,7 +117,7 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: f097b3d6-4351-45fd-9f5f-fc66c72b4ff8
-                        Position: {X: -4.0, Y: 0.0, Z: 3.0}
+                        Position: {X: -13.39603, Y: 0.0, Z: -6.8239307}
                         Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}
@@ -160,7 +160,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 517b1cf0-0e8f-4080-8331-f58eeda88b50
-                        Position: {X: -2.5907714, Y: 0.15, Z: -2.947085}
+                        Position: {X: -11.578671, Y: 0.15, Z: -6.869694}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -182,7 +182,6 @@ Hierarchy:
                         Children:
                             b6aea4526773a2eb04da57403f24f403: ref!! 3439da35-7380-4546-93ad-d4bce9090a87
                             e341da901005e49e7108f03895aa4fbc: ref!! 93005a95-d2d4-4c31-a325-11b761c5809f
-                            494fdb057b50112a3a07d60c8acc59d0: ref!! d4259c41-8d8e-4723-be3d-536a6f7dad6d
                             35ca93934679d7ddf9ee85661d85f344: ref!! 517b1cf0-0e8f-4080-8331-f58eeda88b50
         -   Entity:
                 Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
@@ -190,7 +189,7 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: f26e3a55-12f8-4c31-845a-ecbf72589bc2
-                        Position: {X: -4.0, Y: 0.0, Z: -3.0}
+                        Position: {X: -13.39603, Y: 0.0, Z: -12.823931}
                         Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}
@@ -198,23 +197,6 @@ Hierarchy:
                         Id: 59ea7302-1ddb-4954-926c-530cea8038b8
                         Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
                         Materials: {}
-        -   Folder: null
-            Entity:
-                Id: 81443f9d-1ac8-4652-acb8-72440edb4a10
-                Name: NavPoint3
-                Components:
-                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
-                        Id: d4259c41-8d8e-4723-be3d-536a6f7dad6d
-                        Position: {X: -2.4651513, Y: 0.15, Z: -0.027374506}
-                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
-                        Scale: {X: 0.25, Y: 0.25, Z: 0.25}
-                        Children: {}
-                    21a8309fd43a197b092213e8c068984c: !ModelComponent
-                        Id: f03fdb08-cbcf-4af7-a4ea-21d0e59c6660
-                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
-                        IsShadowCaster: false
-                        Materials:
-                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
         -   Entity:
                 Id: 96113b1a-feae-4e46-a4f8-a7d69fa37243
                 Name: NavPoint1
@@ -311,7 +293,7 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: fe9149ff-0d6e-456d-9d70-e1078950652d
-                        Position: {X: -4.0, Y: 0.0, Z: 0.0}
+                        Position: {X: -13.39603, Y: 0.0, Z: -9.823931}
                         Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}

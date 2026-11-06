@@ -16,6 +16,8 @@ public class SaveMapImageScript : AsyncScript
         public TaskCompletionSource<byte[]> Result =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
+    const double SceneOriginLat = 0;
+    const double SceneOriginLon = 0;
     private readonly ConcurrentQueue<CaptureRequest> _requestsQueue = new();
     public Texture RenderTargetAsset;
 
@@ -31,12 +33,13 @@ public class SaveMapImageScript : AsyncScript
         {
             await Script.NextFrame();
 
-            //if (Input.IsKeyPressed(Keys.F12))
-            //{
-            //    string filePath = Path.Combine(AppContext.BaseDirectory, "local", "map.png");
-            //    CaptureOrthoShot(filePath);
-            //    continue;
-            //}
+            if (Input.IsKeyPressed(Keys.F12))
+            {
+                var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssffff");
+                string filePath = Path.Combine(AppContext.BaseDirectory, "local", $"map.{timestamp}.png");
+                GetTileShot(filePath);
+                continue;
+            }
 
             if (!_requestsQueue.TryDequeue(out var req))
                 continue;
@@ -67,29 +70,31 @@ public class SaveMapImageScript : AsyncScript
         return req.Result.Task;
     }
 
+    private static (double, double) LatLonToMercator(double lat, double lon)
+    {
+        const double R = 6378137.0;
+        double mx = lon * Math.PI / 180.0 * R;
+        double my = Math.Log(Math.Tan(Math.PI / 4.0 + lat * Math.PI / 360.0)) * R;
+        return (mx, my);
+    }
+
     private void MoveToWebMercatorPos(int x, int y, int z)
     {
-        const double earthRadius = 6378137.0;
-        const double originShift = Math.PI * earthRadius; // ~20037508.34
-
-        // Total map size in pixels at this zoom level
+        const double originShift = Math.PI * 6378137.0;
         double mapSize = 256.0 * Math.Pow(2, z);
-
-        // Meters per pixel resolution at this zoom
         double resolution = (2.0 * originShift) / mapSize;
 
-        // Pixel coordinates of the tile's center
-        double pixelX = (x * 256.0) + 128.0;
-        double pixelY = (y * 256.0) + 128.0;
+        double tileMx = (x * 256.0 + 128.0) * resolution - originShift;
+        double tileMy = (y * 256.0 + 128.0) * resolution - originShift;
 
-        // Convert to Stride world coordinates (XZ plane)
-        double worldX = pixelX * resolution - originShift;
-        double worldZ = originShift - (pixelY * resolution);
+        var (originMx, originMy) = LatLonToMercator(SceneOriginLat, SceneOriginLon);
+        var (dx, dy) = (tileMx - originMx, tileMy - originMy);
+        double k = Math.Cos(SceneOriginLat * Math.PI / 180.0);
 
-        // Apply to Stride Camera
         var camera = Entity.Get<CameraComponent>();
-        Entity.Transform.Position = new Vector3((float)worldX, 500f, (float)worldZ); // 500f is safe height above terrain
-        camera.OrthographicSize = (float)(128.0 * resolution); // Half-height of the 256x256 tile
+        Entity.Transform.Position = new Vector3((float)dx, 500f, (float)(dy));
+        camera.OrthographicSize = (float)(256.0 * resolution);
+        Log.Info($"Moved map view camera to {dx}, {dy}");
     }
 
     private byte[] GetTileShot(string tilePath)
@@ -101,12 +106,15 @@ public class SaveMapImageScript : AsyncScript
         }
         var commandList = Game.GraphicsContext.CommandList;
         using var image = RenderTargetAsset.GetDataAsImage(commandList);
-        using var ms = new MemoryStream();
-        image.Save(ms, ImageFileType.Png);
-        byte[] png = ms.ToArray();
-        File.WriteAllBytes(tilePath, png);
+        using var fstream = File.Open(tilePath, FileMode.Create);
+        image.Save(fstream, ImageFileType.Png);
+        using var mstream = new MemoryStream();
+        fstream.CopyTo(mstream);        
         Log.Info($"Saved {tilePath}");
-        return png;
+        //image.Save(ms, ImageFileType.Png);
+        //File.WriteAllBytes(tilePath, png);
+        //return png;
+        return mstream.ToArray();
         //return File.ReadAllBytes("wwwroot/empty.png");
     }
 }

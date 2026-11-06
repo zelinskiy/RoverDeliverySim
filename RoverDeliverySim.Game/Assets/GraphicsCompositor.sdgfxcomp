@@ -224,7 +224,7 @@ Game: !Stride.Rendering.Compositing.SceneCameraRenderer,Stride.Engine
         Children:
             04122af95ece312a0000f86b1aab066e*: !Stride.Rendering.Compositing.RenderTextureSceneRenderer,Stride.Rendering
                 Id: 96f76729-8623-4b1a-ae24-eee046876700
-                RenderTexture: 1fee69ba-f503-440f-b6d0-863fead3d063:Models/Textures/MapRenderTexture
+                RenderTexture: a02651e2-abce-4042-8600-8b53d40f4d1c:Models/Textures/RenderTexture
                 Child: !Stride.Rendering.Compositing.SceneCameraRenderer,Stride.Engine
                     Id: 92a0c1b3-49bd-4678-9afe-f46bfc126aed
                     Camera: ref!! aa64ca60-45ba-479a-9a64-0944ddf82284

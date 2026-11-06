@@ -270,7 +270,7 @@ Hierarchy:
                         Slot: aa64ca60-45ba-479a-9a64-0944ddf82284
                     42e64befcec6dbc6d1ad9c3035b6b6ab: !.SaveMapImageScript,RoverDeliverySim.Game
                         Id: 9fc9da21-b59e-41c6-8bbb-6fb0ead7b6c9
-                        RenderTargetAsset: 1fee69ba-f503-440f-b6d0-863fead3d063:Models/Textures/MapRenderTexture
+                        RenderTargetAsset: a02651e2-abce-4042-8600-8b53d40f4d1c:Models/Textures/RenderTexture
                     5e1c42945a918a69529ec335cad7c146: !RoverDeliverySim.TileServer,RoverDeliverySim.Game
                         Id: 7537d606-1912-4ec1-9cd6-ffb0b0b1aad0
         -   Entity:

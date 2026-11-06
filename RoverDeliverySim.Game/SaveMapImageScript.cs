@@ -20,9 +20,11 @@ public class SaveMapImageScript : AsyncScript
     const double SceneOriginLon = 0;
     private readonly ConcurrentQueue<CaptureRequest> _requestsQueue = new();
     public Texture RenderTargetAsset;
+    private Vector3 _initPosition;
 
     public override async Task Execute()
     {
+        _initPosition = Entity.Transform.Position;
         if (RenderTargetAsset == null)
         {
             Log.Error("RenderTargetAsset is not assigned.");
@@ -35,6 +37,9 @@ public class SaveMapImageScript : AsyncScript
 
             if (Input.IsKeyPressed(Keys.F12))
             {
+                // Move over rover?
+                Entity.Transform.Position = _initPosition;
+                await Script.NextFrame();
                 var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssffff");
                 string filePath = Path.Combine(AppContext.BaseDirectory, "local", $"map.{timestamp}.png");
                 GetTileShot(filePath);
@@ -46,7 +51,7 @@ public class SaveMapImageScript : AsyncScript
 
             try
             {
-                MoveToWebMercatorPos(req.X, req.X, req.Z);
+                MoveToWebMercatorPos(req.X, req.Y, req.Z);
                 await Script.NextFrame();
                 string filePath = Path.Combine(
                     AppContext.BaseDirectory, 
@@ -85,7 +90,7 @@ public class SaveMapImageScript : AsyncScript
         double resolution = (2.0 * originShift) / mapSize;
 
         double tileMx = (x * 256.0 + 128.0) * resolution - originShift;
-        double tileMy = (y * 256.0 + 128.0) * resolution - originShift;
+        double tileMy = originShift - (y * 256.0 + 128.0) * resolution;
 
         var (originMx, originMy) = LatLonToMercator(SceneOriginLat, SceneOriginLon);
         var (dx, dy) = (tileMx - originMx, tileMy - originMy);

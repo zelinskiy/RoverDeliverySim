@@ -1,13 +1,22 @@
-﻿using System;
-using System.IO;
-using System.Threading.Tasks;
+﻿using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Graphics;
 using Stride.Input;
-using Stride.Core.Mathematics;
+using System;
+using System.Collections.Concurrent;
+using System.IO;
+using System.Net.NetworkInformation;
+using System.Threading.Tasks;
 
 public class SaveMapImageScript : AsyncScript
 {
+    private class CaptureRequest
+    {
+        public int X, Y, Z;
+        public TaskCompletionSource<byte[]> Result =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+    private readonly ConcurrentQueue<CaptureRequest> _requestsQueue = new();
     public Texture RenderTargetAsset;
 
     public override async Task Execute()
@@ -22,15 +31,43 @@ public class SaveMapImageScript : AsyncScript
         {
             await Script.NextFrame();
 
-            if (Input.IsKeyPressed(Keys.F12))
+            //if (Input.IsKeyPressed(Keys.F12))
+            //{
+            //    string filePath = Path.Combine(AppContext.BaseDirectory, "local", "map.png");
+            //    CaptureOrthoShot(filePath);
+            //    continue;
+            //}
+
+            if (!_requestsQueue.TryDequeue(out var req))
+                continue;
+
+            try
             {
-                string filePath = Path.Combine(AppContext.BaseDirectory, "local", "map.png");
-                CaptureOrthoShot(filePath);
-            }                
+                MoveToWebMercatorPos(req.X, req.X, req.Z);
+                await Script.NextFrame();
+                string filePath = Path.Combine(
+                    AppContext.BaseDirectory, 
+                    "wwwroot/tiles", 
+                    $"{req.Z}_{req.X}_{req.Y}.png"
+                );                
+                var res = GetTileShot(filePath);
+                req.Result.SetResult(res);
+            }
+            catch (Exception ex)
+            {
+                // Don't leave the HTTP request hanging
+                req.Result.SetException(ex);    
+            }
         }
     }
+    public Task<byte[]> GetTileShotAt(int x, int y, int z)
+    {
+        var req = new CaptureRequest { X = x, Y = y, Z = z };
+        _requestsQueue.Enqueue(req);
+        return req.Result.Task;
+    }
 
-    public async void CaptureMapShotAt(int x, int y, int z)
+    private void MoveToWebMercatorPos(int x, int y, int z)
     {
         const double earthRadius = 6378137.0;
         const double originShift = Math.PI * earthRadius; // ~20037508.34
@@ -53,27 +90,23 @@ public class SaveMapImageScript : AsyncScript
         var camera = Entity.Get<CameraComponent>();
         Entity.Transform.Position = new Vector3((float)worldX, 500f, (float)worldZ); // 500f is safe height above terrain
         camera.OrthographicSize = (float)(128.0 * resolution); // Half-height of the 256x256 tile
-
-        //await Script.NextFrame();
-        string filePath = Path.Combine(AppContext.BaseDirectory, "wwwroot/tiles", $"{z}_{x}_{y}.png");
-        CaptureOrthoShot(filePath);
     }
 
-    private void CaptureOrthoShot(string filePath)
+    private byte[] GetTileShot(string tilePath)
     {
+        if (File.Exists(tilePath))
+        {
+            Log.Info($"Read {tilePath}");
+            return File.ReadAllBytes(tilePath);
+        }
         var commandList = Game.GraphicsContext.CommandList;
-        
-        try
-        {
-            using var image = RenderTargetAsset.GetDataAsImage(commandList);            
-            using var stream = File.Open(filePath, FileMode.Create, FileAccess.Write);
-            image.Save(stream, ImageFileType.Png);
-
-            Log.Info($"Saved {filePath}");
-        }
-        catch (Exception ex)
-        {
-            Log.Error("Failed to save map image", ex);
-        }
+        using var image = RenderTargetAsset.GetDataAsImage(commandList);
+        using var ms = new MemoryStream();
+        image.Save(ms, ImageFileType.Png);
+        byte[] png = ms.ToArray();
+        File.WriteAllBytes(tilePath, png);
+        Log.Info($"Saved {tilePath}");
+        return png;
+        //return File.ReadAllBytes("wwwroot/empty.png");
     }
 }

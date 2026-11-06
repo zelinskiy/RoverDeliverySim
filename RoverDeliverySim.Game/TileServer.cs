@@ -44,29 +44,11 @@ public class TileServer : AsyncScript{
                     int y = int.TryParse(request.QueryString["Y"], out var py) ? py : 0;
                     int z = int.TryParse(request.QueryString["Z"], out var pz) ? pz : 0;
 
-                    Log.Info($"Requested tile {px}:{py}:{pz}");
+                    Log.Info($"Requested tile {x}:{y}:{z}");
 
                     string tilePath = $"wwwroot/tiles/{z}_{x}_{y}.png";
-
-                    if (File.Exists(tilePath))
-                    {
-                        buffer = File.ReadAllBytes(tilePath);
-                    }
-                    else
-                    {
-                        var mapViewCatch = Entity.Get<SaveMapImageScript>();
-                        mapViewCatch.CaptureMapShotAt(x, y, z);
-                        if (File.Exists(tilePath))
-                        {
-                            buffer = File.ReadAllBytes(tilePath);
-                        }
-                        else
-                        {
-                            // Fallback to empty tile
-                            buffer = File.Exists("wwwroot/empty.png") ? File.ReadAllBytes("wwwroot/empty.png") : Array.Empty<byte>();
-                        }                        
-                    }
-
+                    var mapViewCatch = Entity.Get<SaveMapImageScript>();
+                    buffer = await mapViewCatch.GetTileShotAt(x, y, z);
                     response.ContentType = "image/png";
                     response.StatusCode = (int)HttpStatusCode.OK;
                 }

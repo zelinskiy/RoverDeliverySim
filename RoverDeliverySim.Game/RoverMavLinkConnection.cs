@@ -223,10 +223,12 @@ public class RoverMavLinkConnection : AsyncScript
         //var packet = _serverDevice.Context.MessageFactory.Create(GlobalPositionIntPacket.MessageId);
         //var payload = (GlobalPositionIntPayload)packet.GetPayload();
 
-        var packet = new TPacket();
-        packet.SystemId = _mavlinkId.SystemId;
-        packet.ComponentId = _mavlinkId.ComponentId;
-        packet.Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber();
+        var packet = new TPacket
+        {
+            SystemId = _mavlinkId.SystemId,
+            ComponentId = _mavlinkId.ComponentId,
+            Sequence = _serverDevice.Context.Sequence.GetNextSequenceNumber()
+        };
 
         var t = Entity.Transform;
         var rb = Entity.Get<RigidbodyComponent>();
@@ -267,9 +269,16 @@ public class RoverMavLinkConnection : AsyncScript
         var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
             var pos = t.Position;
-            payload.Lat = 511079000 + (int)(pos.Z * 100);
-            payload.Lon = 170385000 + (int)(pos.X * 100);
-            payload.Alt = 118000 + (int)(-pos.Y * 1000);
+            // Breslau, Polen
+            //int lat_offset = 511079000;
+            //int lon_offset = 170385000;
+            //int alt_offset = 118000;
+            int lat_offset = 0;
+            int lon_offset = 0;
+            int alt_offset = 0;
+            payload.Lat = lat_offset + (int)(pos.Z * 100);
+            payload.Lon = lon_offset + (int)(pos.X * 100);
+            payload.Alt = alt_offset + (int)(-pos.Y * 1000);
             payload.RelativeAlt = payload.Alt;
 
             var v = rb.LinearVelocity;

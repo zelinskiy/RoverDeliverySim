@@ -236,8 +236,8 @@ Hierarchy:
                 Components:
                     72d9ed7a4190b5acd05770ad5b84fb19: !TransformComponent
                         Id: 36883066-2892-431f-a3d3-1ed62c2c909d
-                        Position: {X: 6.6640034, Y: 4.0426106, Z: -0.54442215}
-                        Rotation: {X: -0.14114946, Y: 0.7273797, Z: 0.19321674, W: 0.6431666}
+                        Position: {X: 10.183172, Y: 7.2123456, Z: -6.240386}
+                        Rotation: {X: -0.15644962, Y: 0.7838673, Z: 0.20979157, W: 0.5630838}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     441a482c7831e90753a74c30ee109f75: !CameraComponent
@@ -257,7 +257,7 @@ Hierarchy:
                     71f34de0899539fa8f207d717ce1484e: !TransformComponent
                         Id: 2a70b0d9-873b-47b1-9ad8-7adce40dbb8c
                         Position: {X: 0.0, Y: 15.0, Z: 0.0}
-                        Rotation: {X: 0.70710677, Y: -6.181724E-08, Z: -6.181724E-08, W: -0.70710677}
+                        Rotation: {X: -0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     4d95f33899191b213bac9f578970099b: !CameraComponent
@@ -271,7 +271,8 @@ Hierarchy:
                     42e64befcec6dbc6d1ad9c3035b6b6ab: !.SaveMapImageScript,RoverDeliverySim.Game
                         Id: 9fc9da21-b59e-41c6-8bbb-6fb0ead7b6c9
                         RenderTargetAsset: 1fee69ba-f503-440f-b6d0-863fead3d063:Models/Textures/MapRenderTexture
-                        FileName: map.png
+                    5e1c42945a918a69529ec335cad7c146: !RoverDeliverySim.TileServer,RoverDeliverySim.Game
+                        Id: 7537d606-1912-4ec1-9cd6-ffb0b0b1aad0
         -   Entity:
                 Id: e8e1e927-81fb-4953-ae31-19f6c272fd1a
                 Name: Pharmacy

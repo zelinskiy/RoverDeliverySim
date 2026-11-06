@@ -276,13 +276,13 @@ public class RoverMavLinkConnection : AsyncScript
             int lat_offset = 0;
             int lon_offset = 0;
             int alt_offset = 0;
-            payload.Lat = lat_offset + (int)(pos.Z * 100);
+            payload.Lat = lat_offset + (int)(-pos.Z * 100);
             payload.Lon = lon_offset + (int)(pos.X * 100);
             payload.Alt = alt_offset + (int)(-pos.Y * 1000);
             payload.RelativeAlt = payload.Alt;
 
             var v = rb.LinearVelocity;
-            payload.Vx = (short)(v.Z * 100);
+            payload.Vx = (short)(-v.Z * 100);
             payload.Vy = (short)(v.X * 100);
             payload.Vz = (short)(-v.Y * 100);
 
@@ -304,12 +304,12 @@ public class RoverMavLinkConnection : AsyncScript
             var f = Vector3.Normalize(wm.Forward);
             var r = Vector3.Normalize(wm.Right);
             var u = Vector3.Normalize(wm.Up);
-            payload.Yaw = MathF.Atan2(f.X, f.Z);
+            payload.Yaw = MathF.Atan2(f.X, -f.Z);
             payload.Pitch = MathF.Asin(Math.Clamp(f.Y, -1f, 1f));
             payload.Roll = MathF.Atan2(-r.Y, u.Y);
 
             var w = rb.AngularVelocity;
-            payload.Yawspeed = Vector3.Dot(w, u);
+            payload.Yawspeed = -Vector3.Dot(w, u);
             payload.Pitchspeed = Vector3.Dot(w, r);
             payload.Rollspeed = Vector3.Dot(w, f);
 

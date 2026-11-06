@@ -90,7 +90,8 @@ public class SaveMapImageScript : AsyncScript
         double resolution = (2.0 * originShift) / mapSize;
 
         double tileMx = (x * 256.0 + 128.0) * resolution - originShift;
-        double tileMy = originShift - (y * 256.0 + 128.0) * resolution;
+        //double tileMy = originShift - (y * 256.0 + 128.0) * resolution;
+        double tileMy = (y * 256.0 + 128.0) * resolution - originShift;
 
         var (originMx, originMy) = LatLonToMercator(SceneOriginLat, SceneOriginLon);
         var (dx, dy) = (tileMx - originMx, tileMy - originMy);

@@ -13,6 +13,7 @@ using Stride.Engine;
 using Stride.Physics;
 using System;
 using System.Threading;
+using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using static Stride.Graphics.Buffer;
@@ -30,8 +31,9 @@ public class RoverMavLinkConnection : AsyncScript
     private CancellationTokenSource _cts;
     private IProtocolRouter _router;
     private MavlinkIdentity _mavlinkId = new MavlinkIdentity(1, 1);
+    private ConcurrentDictionary<ushort, Vector3> _mission;
 
-    private static readonly (string, float, MavParamType)[] MAVLINK_PARAMETERS = 
+    private static readonly (string, float, MavParamType)[] MAVLINK_PARAMETERS =
     [
         ("SYSID_THISMAV", 1f,    MavParamType.MavParamTypeUint8),
         ("FRAME_CLASS",   1f,    MavParamType.MavParamTypeUint8),
@@ -56,10 +58,10 @@ public class RoverMavLinkConnection : AsyncScript
             builder.RegisterMavlinkV2Protocol(messageFactory);
             builder.Features.RegisterBroadcastFeature<MavlinkMessage>();
             builder.Formatters.RegisterSimpleFormatter();
-        });        
+        });
 
         _router = protocol.CreateRouter("ROUTER");
-        var port = _router.AddUdpPort(p => 
+        var port = _router.AddUdpPort(p =>
         {
             p.Query.Set("rhost", RemoteHost);
             p.Query.Set("rport", RemotePort.ToString());
@@ -88,6 +90,10 @@ public class RoverMavLinkConnection : AsyncScript
         {
             if (msg is MavlinkV2Message mavlinkMsg && mavlinkMsg.FullId == _mavlinkId)
             {
+                if (msg.Name is "A" or "B")
+                {
+                    return;
+                }
                 Log.Info($"[MAVLink] Transmitted {msg.Name}");
             }
         });
@@ -104,7 +110,7 @@ public class RoverMavLinkConnection : AsyncScript
         );
 
         var builder = new ServerDeviceBuilder(_mavlinkId, core);
-        
+
         _serverDevice = ServerDevice.Create(
             _mavlinkId,
             core,
@@ -112,6 +118,7 @@ public class RoverMavLinkConnection : AsyncScript
             {
                 builder.RegisterHeartbeat();
                 builder.RegisterMission();
+                builder.RegisterMissionEx();
                 builder.RegisterParams();
                 builder.RegisterStatus();
                 builder.RegisterCommand();
@@ -130,8 +137,8 @@ public class RoverMavLinkConnection : AsyncScript
         using var listSubscription = paramsService.OnParamRequestList.Subscribe(async req =>
         {
             Log.Info("Parameter list requested");
-            for (ushort i = 0; i<MAVLINK_PARAMETERS.Length; i++)
-            {                
+            for (ushort i = 0; i < MAVLINK_PARAMETERS.Length; i++)
+            {
                 await paramsService.SendParamValue(p =>
                 {
                     var (name, value, type) = MAVLINK_PARAMETERS[i];
@@ -144,7 +151,7 @@ public class RoverMavLinkConnection : AsyncScript
                 });
                 await Task.Delay(10);
             }
-            
+
         });
         using var setSubscription = paramsService.OnParamSet.Subscribe(packet =>
         {
@@ -173,7 +180,7 @@ public class RoverMavLinkConnection : AsyncScript
         heartbeatService.Start();
 
 
-        var commandLongService = _serverDevice.GetCommandLongEx();        
+        var commandLongService = _serverDevice.GetCommandLongEx();
         commandLongService[MavCmd.MavCmdGetHomePosition] = (id, packet, ct) =>
         {
             Log.Info("[MAVLink] Get home called");
@@ -193,19 +200,92 @@ public class RoverMavLinkConnection : AsyncScript
         //    return CommandResult.AcceptedTask;
         //};
 
+        var missionService = _serverDevice.GetMission();
+        
+        //var missionClient = _serverDevice.Get
+
+        // --- LOAD (GCS -> Rover) ---
+        // MISSION_COUNT -> MISSION_REQUEST_INT -> [MISSION_ITEM_INT x N] -> MISSION_ACK (Rover)
+
+        using var onMissionCount =
+            missionService.OnMissionCount.SubscribeAwait(async (req, ct) =>
+            {
+                Log.Info($"Mission COUNT {req.Payload.Count}");
+            });
+
+        using var onMissionRequest =
+            missionService.OnMissionRequestInt.SubscribeAwait(async (req, ct) =>
+            {
+                Log.Info($"Mission REQUEST_INT {req.Payload.Seq}");
+            });
+
+
+        using var onMissionAck =
+            missionService.OnMissionAck.SubscribeAwait(async (req, ct) =>
+            {
+                Log.Info("Mission ACK");
+
+            });
+
+        // --- DOWNLOAD (Rover -> GCS) ---
+        // MISSION_REQUEST_LIST -> MISSION_COUNT -> [MISSION_REQUEST_INT x N] -> [MISSION_ITEM_INT x N] -> MISSION_ACK (GCS)
+
+        using var onMissionList =
+            missionService.OnMissionRequestList.SubscribeAwait(async (req, ct) =>
+            {
+                Log.Info("Mission LIST");
+                await missionService.SendMissionCount(0);
+            });
+
+
+        // --- CHANGE ACTIVE ITEM ---
+        // COMMAND_LONG (MAV_CMD_DO_SET_MISSION_CURRENT) -> COMMAND_ACK + MISSION_CURRENT (Broadcast)
+
+        //missionServiceEx[MavCmd.MavCmdDoSetMissionCurrent] = async (item, ct) =>
+        //{
+        //    Log.Info($"Mission SET_CURRENT {item.Seq}");
+        //    //await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted);
+        //    //await missionService.SendMissionCurrent(item.Seq);
+        //};
+
+        // --- CLEAR ---
+        // MISSION_CLEAR_ALL -> MISSION_ACK (Rover)
+
+        using var onMissionClear =
+            missionService.OnMissionClearAll.SubscribeAwait(async (req, ct) =>
+        {
+            Log.Info("Mission COUNT");
+            //items.Clear();
+            await missionService.SendMissionAck(
+                MavMissionResult.MavMissionAccepted,
+                req.SystemId,
+                req.ComponentId
+            );
+        });
+
+        var missionServiceEx = _serverDevice.GetMissionEx();
+        //missionServiceEx.
+
         float positionTimer = 0f;
+        float tmp = 0f;
 
         while (Game.IsRunning && !_cts.IsCancellationRequested)
         {
-            float deltaTime = (float)Game.UpdateTime.Elapsed.TotalSeconds;            
+            float deltaTime = (float)Game.UpdateTime.Elapsed.TotalSeconds;
 
-            positionTimer += deltaTime;
+            positionTimer += deltaTime;            
             if (positionTimer >= 0.1f)
             {
                 positionTimer = 0f;
                 //await SendLocalPosition();
                 await SendGlobalPosition();
                 await SendAttitude();
+            }
+            tmp += deltaTime;
+            if(tmp >= 1f)
+            {
+                tmp = 0;
+                Log.Info($"Mission count: {missionServiceEx.Items.Count}");
             }
             await Script.NextFrame();
         }
@@ -299,7 +379,8 @@ public class RoverMavLinkConnection : AsyncScript
 
     private async Task SendAttitude()
     {
-        var packet = createPacket<AttitudePacket, AttitudePayload>((payload, t, rb) => {
+        var packet = createPacket<AttitudePacket, AttitudePayload>((payload, t, rb) =>
+        {
             var wm = t.WorldMatrix;
             var f = Vector3.Normalize(wm.Forward);
             var r = Vector3.Normalize(wm.Right);
@@ -317,4 +398,5 @@ public class RoverMavLinkConnection : AsyncScript
         });
         await _router.Send(packet);
     }
+
 }

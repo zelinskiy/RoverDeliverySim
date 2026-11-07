@@ -25,8 +25,8 @@ Hierarchy:
                 Components:
                     a3294146fd186c7e2c4ba3f89c23bda9: !TransformComponent
                         Id: f7dec451-ab07-4506-8977-65e7d2bca1c7
-                        Position: {X: 0.0, Y: 2.0, Z: 0.0}
-                        Rotation: {X: 1.131334E-08, Y: -0.9659258, Z: -0.25881904, W: -4.222196E-08}
+                        Position: {X: 0.0, Y: 15.0, Z: 0.0}
+                        Rotation: {X: 1.3425392E-08, Y: 0.7933533, Z: 0.6087614, W: 1.4328332E-08}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     1392ba253a6ff62041052ab2bd43f031: !LightComponent
@@ -61,9 +61,11 @@ Hierarchy:
                         Materials: {}
                     685a1aee78d9c0b35d681fff16e4dee4: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
+                        Mission: null
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
                         NavNetwork: ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
+                        MissionWaypointTemplate: null
                         TargetPosition: {X: 0.0, Y: 0.0, Z: 0.0}
                     feccb45ae0047ebd110ef237a98adc3a: !RigidbodyComponent
                         Id: a0e1f282-d754-462a-91c3-8583050d2c3d

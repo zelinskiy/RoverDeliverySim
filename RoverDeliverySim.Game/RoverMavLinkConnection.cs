@@ -63,6 +63,10 @@ public class RoverMavLinkConnection : AsyncScript
         | MavProtocolCapability.MavProtocolCapabilityCommandInt
         | MavProtocolCapability.MavProtocolCapabilityMavlink2
         );
+    //POS packets with (0, 0, 0) are ignored by QGC
+    public static readonly int LatOffset = 511079000;
+    public static readonly int LonOffset = 170385000;
+    public static readonly int AltOffset = 118000;
     private IServerDevice _serverDevice;
     private CancellationTokenSource _cts;
     private MavlinkIdentity _mavlinkId = new MavlinkIdentity(1, 1);
@@ -102,23 +106,23 @@ public class RoverMavLinkConnection : AsyncScript
         ("RCMAP_YAW",      4f,    MavParamType.MavParamTypeUint8),
 
         // Channel PWM Calibration
-        ("RC1_MIN",        1100f, MavParamType.MavParamTypeInt32),
-        ("RC1_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC1_MIN",        1000f, MavParamType.MavParamTypeInt32),
+        ("RC1_MAX",        1950f, MavParamType.MavParamTypeInt32),
         ("RC1_TRIM",       1500f, MavParamType.MavParamTypeInt32),
         ("RC1_REV",        1f,    MavParamType.MavParamTypeInt32),
 
-        ("RC2_MIN",        1100f, MavParamType.MavParamTypeInt32),
-        ("RC2_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC2_MIN",        1000f, MavParamType.MavParamTypeInt32),
+        ("RC2_MAX",        1950f, MavParamType.MavParamTypeInt32),
         ("RC2_TRIM",       1500f, MavParamType.MavParamTypeInt32),
         ("RC2_REV",        1f,    MavParamType.MavParamTypeInt32),
 
-        ("RC3_MIN",        1100f, MavParamType.MavParamTypeInt32),
-        ("RC3_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC3_MIN",        1000f, MavParamType.MavParamTypeInt32),
+        ("RC3_MAX",        1950f, MavParamType.MavParamTypeInt32),
         ("RC3_TRIM",       1500f, MavParamType.MavParamTypeInt32),
         ("RC3_REV",        1f,    MavParamType.MavParamTypeInt32),
 
-        ("RC4_MIN",        1100f, MavParamType.MavParamTypeInt32),
-        ("RC4_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC4_MIN",        1000f, MavParamType.MavParamTypeInt32),
+        ("RC4_MAX",        1950f, MavParamType.MavParamTypeInt32),
         ("RC4_TRIM",       1500f, MavParamType.MavParamTypeInt32),
         ("RC4_REV",        1f,    MavParamType.MavParamTypeInt32),
 
@@ -129,29 +133,36 @@ public class RoverMavLinkConnection : AsyncScript
         
         // Accelerometer stuff
         ("INS_ACCL_ID",    67f,   MavParamType.MavParamTypeInt32),  // whatever
-        ("INS_ACCOFFS_X",  0f,    MavParamType.MavParamTypeReal32),
-        ("INS_ACCOFFS_Y",  0f,    MavParamType.MavParamTypeReal32),
-        ("INS_ACCOFFS_Z",  0f,    MavParamType.MavParamTypeReal32),
+        ("INS_ACCL_0_ID",  68f,   MavParamType.MavParamTypeInt32),  // whatever
+        ("INS_ACCOFFS_X",  0.01f, MavParamType.MavParamTypeReal32),
+        ("INS_ACCOFFS_Y",  0.01f, MavParamType.MavParamTypeReal32),
+        ("INS_ACCOFFS_Z",  0.01f, MavParamType.MavParamTypeReal32),
         ("INS_POS1_X",     0f,    MavParamType.MavParamTypeReal32),
         ("INS_POS1_Y",     0f,    MavParamType.MavParamTypeReal32),
         ("INS_POS1_Z",     0f,    MavParamType.MavParamTypeReal32),
 
         // Compass stuff
-        ("COMPASS_DEV_ID", 0f,    MavParamType.MavParamTypeInt32),
+        ("COMPASS_DEV_ID", 1024f, MavParamType.MavParamTypeInt32),
         ("COMPASS_DEV_ID2",0f,    MavParamType.MavParamTypeInt32),
         ("COMPASS_DEV_ID3",0f,    MavParamType.MavParamTypeInt32),
 
-        ("COMPASS_OFS_X",  0f,    MavParamType.MavParamTypeReal32),
-        ("COMPASS_OFS_Y",  0f,    MavParamType.MavParamTypeReal32),
-        ("COMPASS_OFS_Z",  0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_USE",   1f,     MavParamType.MavParamTypeInt32),
 
-        ("COMPASS_OFS2_X", 0f,    MavParamType.MavParamTypeReal32),
-        ("COMPASS_OFS2_Y", 0f,    MavParamType.MavParamTypeReal32),
-        ("COMPASS_OFS2_Z", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS_X",  5.0f,  MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS_Y",  10.0f, MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS_Z",  -15.0f,MavParamType.MavParamTypeReal32),
+
+        ("COMPASS_OFS2_X", 1f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS2_Y", 1f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS2_Z", 1f,    MavParamType.MavParamTypeReal32),
 
         ("COMPASS_OFS3_X", 0f,    MavParamType.MavParamTypeReal32),
         ("COMPASS_OFS3_Y", 0f,    MavParamType.MavParamTypeReal32),
         ("COMPASS_OFS3_Z", 0f,    MavParamType.MavParamTypeReal32),
+
+        ("COMPASS_DIA_X", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_DIA_Y", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_DIA_Z", 0f,    MavParamType.MavParamTypeReal32),
 
         ("COMPASS_DEC",    0f,    MavParamType.MavParamTypeReal32),  // Magnetic declination (radians)
         ("COMPASS_AUTODEC",1f,    MavParamType.MavParamTypeInt32),
@@ -162,8 +173,9 @@ public class RoverMavLinkConnection : AsyncScript
 
         // Gyroscope Stuff
         ("INS_GYRO_ID",    42f,    MavParamType.MavParamTypeReal32),
+        ("INS_GYRO_0_ID",  43f,    MavParamType.MavParamTypeReal32),
 
-        ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32)
+        ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32),
     ];
 
     private class RoverModeHandler(Logger log, ICustomMode mode) : IWorkModeHandler
@@ -682,17 +694,10 @@ public class RoverMavLinkConnection : AsyncScript
     {
         var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
-            var pos = t.Position;
-            // Breslau, Polen
-            //int lat_offset = 511079000;
-            //int lon_offset = 170385000;
-            //int alt_offset = 118000;
-            int lat_offset = 0;
-            int lon_offset = 0;
-            int alt_offset = 0;
-            payload.Lat = lat_offset + (int)(-pos.Z * 100);
-            payload.Lon = lon_offset + (int)(pos.X * 100);
-            payload.Alt = alt_offset + (int)(-pos.Y * 1000);
+            var pos = t.Position;            
+            payload.Lat = LatOffset + (int)(-pos.Z * 100);
+            payload.Lon = LonOffset + (int)(pos.X * 100);
+            payload.Alt = AltOffset + (int)(-pos.Y * 1000);
             payload.RelativeAlt = payload.Alt;
 
             var v = rb.LinearVelocity;

@@ -16,8 +16,9 @@ public class SaveMapImageScript : AsyncScript
         public TaskCompletionSource<byte[]> Result =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
-    const double SceneOriginLat = 0;
-    const double SceneOriginLon = 0;
+    const double SceneOriginLat = 511079000;
+    const double SceneOriginLon = 170385000;
+    const double SceneOriginAlt = 170385000;
     private readonly ConcurrentQueue<CaptureRequest> _requestsQueue = new();
     public Texture RenderTargetAsset;
     private Vector3 _initPosition;

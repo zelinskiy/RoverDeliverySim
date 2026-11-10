@@ -2,24 +2,28 @@
 using Asv.IO;
 using Asv.Mavlink;
 using Asv.Mavlink.Common;
+using Asv.Mavlink.Diagnostic;
+using Asv.Mavlink.Diagnostic.Server;
 using Asv.Mavlink.Minimal;
 using BulletSharp.SoftBody;
 using DotNext;
 using DotNext.Threading;
 using Newtonsoft.Json.Linq;
 using R3;
+using Stride.Core.Diagnostics;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Physics;
 using System;
-using System.Threading;
 using System.Collections.Concurrent;
+using System.Linq;
+using System.Net.Sockets;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using static Stride.Core.Diagnostics.TimestampLocalLogger;
 using static Stride.Graphics.Buffer;
-using System.Linq;
-using Stride.Core.Diagnostics;
-using Asv.Mavlink.Diagnostic;
+using static Stride.Shaders.Spirv.Core.ImageOperandsParams;
 
 namespace RoverDeliverySim;
 
@@ -41,6 +45,24 @@ public class RoverMavLinkConnection : AsyncScript
         ArduCopterMode.Rtl,
         ArduCopterMode.SmartRtl,
     };
+    // To disable single sensor:
+    // var sensors = Sensors & ~MavSysStatusSensor.MavSysStatusSensorGps;
+    public static readonly MavSysStatusSensor Sensors = 
+        ( MavSysStatusSensor.MavSysStatusPrearmCheck    // Skip arming checks in QGC
+        | MavSysStatusSensor.MavSysStatusSensor3dGyro
+        | MavSysStatusSensor.MavSysStatusSensor3dAccel
+        | MavSysStatusSensor.MavSysStatusSensor3dMag
+        //| MavSysStatusSensor.MavSysStatusSensorGps
+        | MavSysStatusSensor.MavSysStatusSensorMotorOutputs
+        | MavSysStatusSensor.MavSysStatusSensorRcReceiver
+        );
+    public static readonly MavProtocolCapability Capabilities =
+        (MavProtocolCapability.MavProtocolCapabilityMissionFloat
+        | MavProtocolCapability.MavProtocolCapabilityParamFloat
+        | MavProtocolCapability.MavProtocolCapabilityMissionInt
+        | MavProtocolCapability.MavProtocolCapabilityCommandInt
+        | MavProtocolCapability.MavProtocolCapabilityMavlink2
+        );
     private IServerDevice _serverDevice;
     private CancellationTokenSource _cts;
     private MavlinkIdentity _mavlinkId = new MavlinkIdentity(1, 1);
@@ -49,23 +71,99 @@ public class RoverMavLinkConnection : AsyncScript
         "ATTITUDE", 
         "HEARTBEAT", 
         "GLOBAL_POSITION_INT", 
-        "LOCAL_POSITION_INT" 
+        "LOCAL_POSITION_INT",
+        "SYS_STATUS",
+        "REQUEST_DATA_STREAM",
+        "FILE_TRANSFER_PROTOCOL",
     }; 
 
     private static readonly (string, float, MavParamType)[] MAVLINK_PARAMETERS =
     [
         ("SYSID_THISMAV", 1f,    MavParamType.MavParamTypeUint8),
         ("FRAME_CLASS",   1f,    MavParamType.MavParamTypeUint8),
-        ("ARMING_CHECK",  1f,    MavParamType.MavParamTypeInt32),
+        ("ARMING_CHECK",  0f,    MavParamType.MavParamTypeInt32), // Only for testing!
         ("CRUISE_SPEED",  2f,    MavParamType.MavParamTypeReal32),
         ("WP_RADIUS",     2f,    MavParamType.MavParamTypeReal32),
 
+        // Hardcoded from Ardupilot
         ("FLTMODE1",      0f,    MavParamType.MavParamTypeUint8),   // Manual
         ("FLTMODE2",      4f,    MavParamType.MavParamTypeUint8),   // Hold
         ("FLTMODE3",      15f,   MavParamType.MavParamTypeUint8),   // Guided
         ("FLTMODE4",      10f,   MavParamType.MavParamTypeUint8),   // Auto
+        ("FLTMODE5",       0f,   MavParamType.MavParamTypeUint8),   // Manual
+        ("FLTMODE6",       0f,   MavParamType.MavParamTypeUint8),   // Manual
         ("GUID_SPEED",    2f,    MavParamType.MavParamTypeReal32),
         ("GUID_TIMEOUT",  3f,    MavParamType.MavParamTypeReal32),
+
+        // Manual RC mapping
+        ("RCMAP_ROLL",     1f,    MavParamType.MavParamTypeUint8),
+        ("RCMAP_PITCH",    2f,    MavParamType.MavParamTypeUint8),
+        ("RCMAP_THROTTLE", 3f,    MavParamType.MavParamTypeUint8),
+        ("RCMAP_YAW",      4f,    MavParamType.MavParamTypeUint8),
+
+        // Channel PWM Calibration
+        ("RC1_MIN",        1100f, MavParamType.MavParamTypeInt32),
+        ("RC1_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC1_TRIM",       1500f, MavParamType.MavParamTypeInt32),
+        ("RC1_REV",        1f,    MavParamType.MavParamTypeInt32),
+
+        ("RC2_MIN",        1100f, MavParamType.MavParamTypeInt32),
+        ("RC2_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC2_TRIM",       1500f, MavParamType.MavParamTypeInt32),
+        ("RC2_REV",        1f,    MavParamType.MavParamTypeInt32),
+
+        ("RC3_MIN",        1100f, MavParamType.MavParamTypeInt32),
+        ("RC3_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC3_TRIM",       1500f, MavParamType.MavParamTypeInt32),
+        ("RC3_REV",        1f,    MavParamType.MavParamTypeInt32),
+
+        ("RC4_MIN",        1100f, MavParamType.MavParamTypeInt32),
+        ("RC4_MAX",        1900f, MavParamType.MavParamTypeInt32),
+        ("RC4_TRIM",       1500f, MavParamType.MavParamTypeInt32),
+        ("RC4_REV",        1f,    MavParamType.MavParamTypeInt32),
+
+        // Failsafe Configuration
+        ("FS_OPTIONS",      0f,   MavParamType.MavParamTypeInt32),   // Bitmask: e.g., bit 0/1/2 to continue in Auto/Guided on failsafe
+        ("FS_GCS_ENABLE",   1f,   MavParamType.MavParamTypeInt32),   // GCS telemetry failsafe action (0 = disabled, 1 = enabled/RTL/Hold)
+        ("FS_GCS_TIMEOUT",  5f,   MavParamType.MavParamTypeReal32),  // Seconds without GCS
+        
+        // Accelerometer stuff
+        ("INS_ACCL_ID",    67f,   MavParamType.MavParamTypeInt32),  // whatever
+        ("INS_ACCOFFS_X",  0f,    MavParamType.MavParamTypeReal32),
+        ("INS_ACCOFFS_Y",  0f,    MavParamType.MavParamTypeReal32),
+        ("INS_ACCOFFS_Z",  0f,    MavParamType.MavParamTypeReal32),
+        ("INS_POS1_X",     0f,    MavParamType.MavParamTypeReal32),
+        ("INS_POS1_Y",     0f,    MavParamType.MavParamTypeReal32),
+        ("INS_POS1_Z",     0f,    MavParamType.MavParamTypeReal32),
+
+        // Compass stuff
+        ("COMPASS_DEV_ID", 0f,    MavParamType.MavParamTypeInt32),
+        ("COMPASS_DEV_ID2",0f,    MavParamType.MavParamTypeInt32),
+        ("COMPASS_DEV_ID3",0f,    MavParamType.MavParamTypeInt32),
+
+        ("COMPASS_OFS_X",  0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS_Y",  0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS_Z",  0f,    MavParamType.MavParamTypeReal32),
+
+        ("COMPASS_OFS2_X", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS2_Y", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS2_Z", 0f,    MavParamType.MavParamTypeReal32),
+
+        ("COMPASS_OFS3_X", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS3_Y", 0f,    MavParamType.MavParamTypeReal32),
+        ("COMPASS_OFS3_Z", 0f,    MavParamType.MavParamTypeReal32),
+
+        ("COMPASS_DEC",    0f,    MavParamType.MavParamTypeReal32),  // Magnetic declination (radians)
+        ("COMPASS_AUTODEC",1f,    MavParamType.MavParamTypeInt32),
+
+        // Battery Stuff
+        ("BATT_MONITOR",   0f,    MavParamType.MavParamTypeUint8),   // Disabled to prevent low voltage pre-arm block
+        ("BATT_VOLT_MSRC", 12600f, MavParamType.MavParamTypeReal32),
+
+        // Gyroscope Stuff
+        ("INS_GYRO_ID",    42f,    MavParamType.MavParamTypeReal32),
+
+        ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32)
     ];
 
     private class RoverModeHandler(Logger log, ICustomMode mode) : IWorkModeHandler
@@ -142,17 +240,21 @@ public class RoverMavLinkConnection : AsyncScript
                     ArduCopterMode.PosHold,
                     SupportedModes,
                     mode => new RoverModeHandler(Log, mode)
-                );                
-                             
-                //builder.RegisterFtpEx();      // File transfer
-                //builder.RegisterGbsEx();        //GBS (Ground Control Station)   
-                builder.RegisterDiagnostic();
+                );
 
-                //builder.RegisterRsgaEx();     //RSGA (Radiosonde Ground Apparatus) --  radio track points?
+                //builder.RegisterFtpEx();      // File transfer
+                //builder.RegisterGbsEx();      //GBS (Ground Control Station)   
+                builder.RegisterDiagnostic();
+                //builder.Register((id, _, _) => new DiagnosticServer(id, new DiagnosticServerConfig(), core));
+
+                //RSGA (Radiosonde Ground Apparatus) -- e.g. radio track points?
+                //builder.RegisterRsgaEx();     
                 //builder.RegisterV2Ext();
-                //builder.Register<DgpsServer>();                
-                //builder.Register<ControlServer>();    // Currently unavailable in asv-mavlink
-                //builder.Register<TelemetryServer>();  // Currently unavailable in asv-mavlink
+                //builder.Register<DgpsServer>();
+                // Currently unavailable in asv-mavlink:
+                //builder.Register<ControlServer>();
+                // Currently unavailable in asv-mavlink:
+                //builder.Register<TelemetryServer>();
             });
 
         await SetupHeartbeatService();
@@ -162,7 +264,14 @@ public class RoverMavLinkConnection : AsyncScript
         await SetupMissionService();
         await SetupStatusService();
         await SetupModeService();
+        await SetupDiagnostic();
+        //await SetupFileTransfer();
 
+        
+        // TODO: Match frequencies:
+        // HEARTBEAT, SYS_STATUS: 1 Hz
+        // GLOBAL_POSITION_INT, LOCAL_POSITION_NED: 2-5 Hz
+        // ATTITUDE: 10-20 Hz
         float positionTimer = 0f;
 
         while (Game.IsRunning && !_cts.IsCancellationRequested)
@@ -176,6 +285,7 @@ public class RoverMavLinkConnection : AsyncScript
                 //await SendLocalPosition();
                 await SendGlobalPosition();
                 await SendAttitude();
+                await SendSysStatus();
             }
             await Script.NextFrame();
         }
@@ -183,6 +293,17 @@ public class RoverMavLinkConnection : AsyncScript
         _cts.Cancel();
         //_router.Dispose(); TBD ???
         // TODO: properly dispose all subscriptions and resources, including Setup*() method calls
+    }
+
+    private async Task SetupDiagnostic()
+    {
+        //DiagnosticServer diagnosticService = _serverDevice.Get<DiagnosticServer>();
+        var diagnosticService = _serverDevice.GetDiagnostic();
+        if (!diagnosticService.IsInit) await diagnosticService.Init(_cts.Token);
+
+        //diagnosticService.Send("")
+
+        diagnosticService.Start();
     }
 
     private IProtocolRouter SetupRouter(IProtocolFactory protocol)
@@ -211,8 +332,9 @@ public class RoverMavLinkConnection : AsyncScript
             });
         }
 
-        router.OnRxMessage.Subscribe(msg =>
+        router.OnRxMessage.Subscribe(async msg =>
         {
+            // TODO: Pay attention to SystemId/ComponentId
             if (MUTED_MESSAGES.Contains(msg.Name))
             {
                 return;
@@ -220,6 +342,39 @@ public class RoverMavLinkConnection : AsyncScript
             if (msg is MavlinkV2Message mavlinkMsg && mavlinkMsg.FullId != _mavlinkId)
             {
                 Log.Info($"[MAVLink] Received {mavlinkMsg.Name} from ({mavlinkMsg.SystemId}, {mavlinkMsg.ComponentId})");
+                if (msg is FileTransferProtocolPacket ftpPacket)
+                {
+                    // Construct an explicit NAK response indicating failure/unsupported session
+                    var responsePacket = new FileTransferProtocolPacket();
+                    responsePacket.Payload.TargetSystem = ftpPacket.SystemId;
+                    responsePacket.Payload.TargetComponent = ftpPacket.ComponentId;
+                    responsePacket.Payload.TargetNetwork = ftpPacket.Payload.TargetNetwork;
+
+                    // Byte 0: 0x84 (NAK response), Byte 2: Error code (e.g., Fail = 1 or NoSessionsAvailable = 3)
+                    responsePacket.Payload.Payload[0] = 0x84; // NAK
+                    responsePacket.Payload.Payload[2] = 3;   // Fail / Unsupported error code
+
+                    await _serverDevice.Context.Connection.Send(responsePacket);
+                }
+                else if (msg is CommandLongPacket cmdLong)
+                {
+                    Log.Info($"Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
+                        $"Params: {cmdLong.Payload.Param1}:" +
+                        $"{cmdLong.Payload.Param2}:" +
+                        $"{cmdLong.Payload.Param3}:" +
+                        $"{cmdLong.Payload.Param4}:" +
+                        $"{cmdLong.Payload.Param5}:" +
+                        $"{cmdLong.Payload.Param6}:" +
+                        $"{cmdLong.Payload.Param7}:");
+                }
+                else if (msg is CommandIntPacket cmdInt)
+                {
+                    Log.Info($"Mavlink CMD_LONG: {cmdInt.Payload.Command}, " +
+                        $"Params: {cmdInt.Payload.Param1}:" +
+                        $"{cmdInt.Payload.Param2}:" +
+                        $"{cmdInt.Payload.Param3}:" +
+                        $"{cmdInt.Payload.Param4}");
+                }
             }
         });
         router.OnTxMessage.Subscribe(msg =>
@@ -238,6 +393,13 @@ public class RoverMavLinkConnection : AsyncScript
             }
         });
         return router;
+    }
+
+    private async Task SetupFileTransfer()
+    {
+        var ftpService = _serverDevice.GetFtpEx();
+        if (!ftpService.IsInit) await ftpService.Init(_cts.Token);
+        ftpService.Start();
     }
 
     private async Task SetupParamsService()
@@ -300,7 +462,7 @@ public class RoverMavLinkConnection : AsyncScript
             hb.SystemStatus = MavState.MavStateActive;
             hb.MavlinkVersion = 3;
         });
-        await heartbeatService.Init(_cts.Token);
+        if (!heartbeatService.IsInit) await heartbeatService.Init(_cts.Token);
         heartbeatService.Start();
     }
 
@@ -340,7 +502,9 @@ public class RoverMavLinkConnection : AsyncScript
 
     private async Task SetupCommandService()
     {
+        
         var commandIntService = _serverDevice.GetCommandIntEx();
+        if (!commandIntService.IsInit) await commandIntService.Init(_cts.Token);
         commandIntService[MavCmd.MavCmdGetHomePosition] = async (id, packet, ct) =>
         {
             Log.Info("[MAVLink] Get home called");
@@ -350,11 +514,32 @@ public class RoverMavLinkConnection : AsyncScript
         {
             Log.Info("[MAVLink] Set home called");
             return CommandResult.Accepted;
-        };
-        await commandIntService.Init(_cts.Token);
+        };        
         commandIntService.Start();
 
-        //var commandLongService = _serverDevice.GetCommandLongEx();
+        var commandLongService = _serverDevice.GetCommandLongEx();
+        if (!commandLongService.IsInit) await commandLongService.Init(_cts.Token);
+        commandLongService[MavCmd.MavCmdRequestMessage] = async (id, packet, ct) =>
+        {
+            var param1 = packet.Payload.Param1;
+            switch (param1)
+            {
+                case AutopilotVersionPacket.MessageId:
+                    Log.Info("Requested ");
+                    await SendAutopilotVersion();
+                    return CommandResult.Accepted;
+                default:
+                    Log.Info($"Requested unhandled message {param1}");
+                    return CommandResult.Unsupported;
+            }
+            
+        };
+        commandLongService[MavCmd.MavCmdRequestAutopilotCapabilities] = async (id, packet, ct) =>
+        {
+            await SendAutopilotVersion();
+            return CommandResult.Accepted;
+        };
+        commandLongService.Start();
     }
 
     private async Task SetupMissionService()
@@ -548,4 +733,37 @@ public class RoverMavLinkConnection : AsyncScript
         await _serverDevice.Context.Connection.Send(packet);
     }
 
+    private async Task SendSysStatus()
+    {
+        var packet = createPacket<SysStatusPacket, SysStatusPayload>((payload, t, rb) => {
+            payload.OnboardControlSensorsPresent = Sensors;
+            payload.OnboardControlSensorsEnabled = Sensors;
+            payload.OnboardControlSensorsHealth = Sensors;
+            payload.VoltageBattery = 12600; // V * 100^(-3)
+            payload.CurrentBattery = 150;   // A * 10^(-2)
+            payload.BatteryRemaining = 100; // 100%
+            payload.Load = 50;              // 5% CPU load
+            payload.DropRateComm = 0;       // 0% packet drop
+            payload.ErrorsComm = 0;         // 0 link errors
+            payload.ErrorsCount1 = 0;
+            payload.ErrorsCount2 = 0;
+            payload.ErrorsCount3 = 0;
+            payload.ErrorsCount4 = 0;
+        });
+        await _serverDevice.Context.Connection.Send(packet);
+    }
+
+    private async Task SendAutopilotVersion()
+    {
+        var packet = createPacket<AutopilotVersionPacket, AutopilotVersionPayload>((payload, t, rb) => {            
+            payload.Capabilities = Capabilities;
+            payload.FlightSwVersion = 0x04070200;
+            payload.Uid = 123456789L;
+            payload.BoardVersion = 0;
+            payload.VendorId = 0;
+            payload.ProductId = 0;
+
+        });
+        await _serverDevice.Context.Connection.Send(packet);
+    }
 }

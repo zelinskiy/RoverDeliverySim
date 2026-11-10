@@ -16,9 +16,9 @@ public class SaveMapImageScript : AsyncScript
         public TaskCompletionSource<byte[]> Result =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
-    const double SceneOriginLat = 511079000;
-    const double SceneOriginLon = 170385000;
-    const double SceneOriginAlt = 170385000;
+    public static readonly double SceneOriginLat = 51.1079;
+    public static readonly double SceneOriginLon = 17.0385;
+    public static readonly double SceneOriginAlt = 118.0;
     private readonly ConcurrentQueue<CaptureRequest> _requestsQueue = new();
     public Texture RenderTargetAsset;
     private Vector3 _initPosition;
@@ -87,21 +87,22 @@ public class SaveMapImageScript : AsyncScript
     private void MoveToWebMercatorPos(int x, int y, int z)
     {
         const double originShift = Math.PI * 6378137.0;
-        double mapSize = 256.0 * Math.Pow(2, z);
-        double resolution = (2.0 * originShift) / mapSize;
+        double resolution = (2.0 * originShift) / (256.0 * Math.Pow(2, z));
 
+        // Tile centre in Mercator meters (XYZ: Y grows southward)
         double tileMx = (x * 256.0 + 128.0) * resolution - originShift;
-        //double tileMy = originShift - (y * 256.0 + 128.0) * resolution;
-        double tileMy = (y * 256.0 + 128.0) * resolution - originShift;
+        double tileMy = originShift - (y * 256.0 + 128.0) * resolution; // northing
 
         var (originMx, originMy) = LatLonToMercator(SceneOriginLat, SceneOriginLon);
-        var (dx, dy) = (tileMx - originMx, tileMy - originMy);
         double k = Math.Cos(SceneOriginLat * Math.PI / 180.0);
 
+        double east = (tileMx - originMx) * k;   // ground meters
+        double north = (tileMy - originMy) * k;
+
         var camera = Entity.Get<CameraComponent>();
-        Entity.Transform.Position = new Vector3((float)dx, 500f, (float)(dy));
-        camera.OrthographicSize = (float)(256.0 * resolution);
-        Log.Info($"Moved map view camera to {dx}, {dy}");
+        Entity.Transform.Position = new Vector3((float)east, 500f, (float)(-north));
+        camera.OrthographicSize = (float)(256.0 * resolution * k);
+        Log.Info($"Moved map view camera to E={east}, N={north}");
     }
 
     private byte[] GetTileShot(string tilePath)

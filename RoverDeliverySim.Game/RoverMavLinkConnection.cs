@@ -1,6 +1,7 @@
 ﻿using Asv.Common;
 using Asv.IO;
 using Asv.Mavlink;
+using Asv.Mavlink.Ardupilotmega;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Diagnostic;
 using Asv.Mavlink.Diagnostic.Server;
@@ -21,9 +22,11 @@ using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using ZstdSharp.Unsafe;
 using static Stride.Core.Diagnostics.TimestampLocalLogger;
 using static Stride.Graphics.Buffer;
 using static Stride.Shaders.Spirv.Core.ImageOperandsParams;
+using MavCmd = Asv.Mavlink.Common.MavCmd;
 
 namespace RoverDeliverySim;
 
@@ -36,14 +39,18 @@ public class RoverMavLinkConnection : AsyncScript
     public string RemoteHost = "127.0.0.1";
     public int LocalPort = 14560;
     public string LocalHost = "127.0.0.1";
-    public readonly ArduCopterMode[] SupportedModes = 
+    Asv.Mavlink.Ardupilotmega.RoverMode.
+    public readonly RoverMode[] SupportedModes = 
     {
-        ArduCopterMode.Stabilize,
-        ArduCopterMode.PosHold,
-        ArduCopterMode.Guided,
-        ArduCopterMode.Auto,
-        ArduCopterMode.Rtl,
-        ArduCopterMode.SmartRtl,
+        RoverMode.RoverModeManual,
+        //RoverMode.RoverModeSteering, ??
+        RoverMode.RoverModeHold,
+        RoverMode.RoverModeGuided,
+        RoverMode.RoverModeAuto,
+        RoverMode.RoverModeFollow,
+        RoverMode.RoverModeRtl,
+        RoverMode.RoverModeSmartRtl,
+        //RoverMode.RoverModeInitializing, ??
     };
     // To disable single sensor:
     // var sensors = Sensors & ~MavSysStatusSensor.MavSysStatusSensorGps;
@@ -63,10 +70,6 @@ public class RoverMavLinkConnection : AsyncScript
         | MavProtocolCapability.MavProtocolCapabilityCommandInt
         | MavProtocolCapability.MavProtocolCapabilityMavlink2
         );
-    //POS packets with (0, 0, 0) are ignored by QGC
-    public static readonly int LatOffset = 511079000;
-    public static readonly int LonOffset = 170385000;
-    public static readonly int AltOffset = 118000;
     private IServerDevice _serverDevice;
     private CancellationTokenSource _cts;
     private MavlinkIdentity _mavlinkId = new MavlinkIdentity(1, 1);
@@ -178,37 +181,37 @@ public class RoverMavLinkConnection : AsyncScript
         ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32),
     ];
 
-    private class RoverModeHandler(Logger log, ICustomMode mode) : IWorkModeHandler
-    {
-        public ICustomMode Mode { get; } = mode;
-        public Logger Log { get; } = log;
-        public Task Init(CancellationToken cancel)
-        {
-            if (Mode is ArduCopterMode mode)
-            {
-                Log.Info($"Handler for {mode.Name} mode created");
-                //if (mode == ArduCopterMode.Guided)
-                //{
-                //    Log.Info($"Handler for Guided mode created");
-                //}
-            }
-            return Task.CompletedTask;
-        }
+    //private class RoverModeHandler(Logger log, ICustomMode mode) : IWorkModeHandler
+    //{
+    //    public ICustomMode Mode { get; } = mode;
+    //    public Logger Log { get; } = log;
+    //    public Task Init(CancellationToken cancel)
+    //    {
+    //        if (Mode is ArduCopterMode mode)
+    //        {
+    //            Log.Info($"Handler for {mode.Name} mode created");
+    //            //if (mode == ArduCopterMode.Guided)
+    //            //{
+    //            //    Log.Info($"Handler for Guided mode created");
+    //            //}
+    //        }
+    //        return Task.CompletedTask;
+    //    }
 
-        public Task Destroy(CancellationToken cancel)
-        {
-            if (Mode is ArduCopterMode mode)
-            {
-                Log.Info($"Handler for {mode.Name} mode destroyed");
-                //if (mode == ArduCopterMode.Guided)
-            }
-            return Task.CompletedTask;
-        }
-        public void Dispose()
-        {
+    //    public Task Destroy(CancellationToken cancel)
+    //    {
+    //        if (Mode is ArduCopterMode mode)
+    //        {
+    //            Log.Info($"Handler for {mode.Name} mode destroyed");
+    //            //if (mode == ArduCopterMode.Guided)
+    //        }
+    //        return Task.CompletedTask;
+    //    }
+    //    public void Dispose()
+    //    {
 
-        }
-    }
+    //    }
+    //}
 
     public override async Task Execute()
     {
@@ -248,11 +251,15 @@ public class RoverMavLinkConnection : AsyncScript
                 builder.RegisterMissionEx();
                 builder.RegisterStatus();
 
-                builder.RegisterMode(
-                    ArduCopterMode.PosHold,
-                    SupportedModes,
-                    mode => new RoverModeHandler(Log, mode)
-                );
+                // Can't use the standard mode microservice since it got mode mapping implemented
+                // only for Px4 and ArduCopter, and we need ArduPilotMega Drones.
+                // TODO: Perhaps make our own microservice OR implement RoverMode : ICustomMode?
+
+                //builder.RegisterMode(
+                //    ArduCopterMode.PosHold,
+                //    SupportedModes,
+                //    mode => new RoverModeHandler(Log, mode)
+                //);
 
                 //builder.RegisterFtpEx();      // File transfer
                 //builder.RegisterGbsEx();      //GBS (Ground Control Station)   
@@ -465,9 +472,20 @@ public class RoverMavLinkConnection : AsyncScript
         var heartbeatService = _serverDevice.GetHeartbeat();
         heartbeatService.Set(hb =>
         {
+            var modeService = _serverDevice.GetMode();
+            modeService.CurrentMode.CurrentValue.Mode.GetCommandLongArgs(
+                out var baseMode, 
+                out var customMode, 
+                out var customSubMode
+            );
+            Log.Info($"Current mode: {modeService.CurrentMode.CurrentValue.Mode.Name}; {baseMode}:{customMode}");
+
+            //MavMode.
             hb.Type = MavType.MavTypeGroundRover;
             // QGC has hardcoded mode flags from Ardupilot
+            //hb.Autopilot = MavAutopilot.MavAutopilotArdupilotmega;
             hb.Autopilot = MavAutopilot.MavAutopilotArdupilotmega;
+            //hb.BaseMode = (MavModeFlag)baseMode;
             hb.BaseMode = MavModeFlag.MavModeFlagCustomModeEnabled;
             // Bit flags: can add e.g. | MavModeFlag.MavModeFlagSafetyArmed;
             hb.CustomMode = 4;
@@ -526,22 +544,22 @@ public class RoverMavLinkConnection : AsyncScript
         {
             Log.Info("[MAVLink] Set home called");
             return CommandResult.Accepted;
-        };        
+        };
         commandIntService.Start();
 
         var commandLongService = _serverDevice.GetCommandLongEx();
         if (!commandLongService.IsInit) await commandLongService.Init(_cts.Token);
         commandLongService[MavCmd.MavCmdRequestMessage] = async (id, packet, ct) =>
         {
-            var param1 = packet.Payload.Param1;
-            switch (param1)
+            var messageId = packet.Payload.Param1;
+            switch (messageId)
             {
                 case AutopilotVersionPacket.MessageId:
-                    Log.Info("Requested ");
+                    Log.Info("Requested Autopilot Version");
                     await SendAutopilotVersion();
                     return CommandResult.Accepted;
                 default:
-                    Log.Info($"Requested unhandled message {param1}");
+                    Log.Info($"Requested unhandled message {messageId}");
                     return CommandResult.Unsupported;
             }
             
@@ -549,6 +567,14 @@ public class RoverMavLinkConnection : AsyncScript
         commandLongService[MavCmd.MavCmdRequestAutopilotCapabilities] = async (id, packet, ct) =>
         {
             await SendAutopilotVersion();
+            return CommandResult.Accepted;
+        };
+        commandLongService[MavCmd.MavCmdDoSetMode] = async (id, packet, ct) =>
+        {
+            Log.Info("[MAVLink] Set mode called (LONG)");
+            var modeService = _serverDevice.GetMode();
+            //modeService.CurrentMode.CurrentValue.
+            Log.Info($"[MAVLink] Current mode: {modeService.CurrentMode.CurrentValue.Mode}");
             return CommandResult.Accepted;
         };
         commandLongService.Start();
@@ -662,6 +688,8 @@ public class RoverMavLinkConnection : AsyncScript
         var modeService = _serverDevice.GetMode();
         if (!modeService.IsInit) await modeService.Init(_cts.Token);
 
+        
+
         //await modeService.SetMode(ArduCopterMode.Loiter, handler =>
         //{
         //    Console.WriteLine("Mode change requested: Loiter");
@@ -672,6 +700,7 @@ public class RoverMavLinkConnection : AsyncScript
         });
 
         modeService.Start();
+        Log.Info($"Started modes microservice. Supported modes: {string.Concat(", ", modeService.AvailableModes.Select(m => m.Name))}");
     }
 
     private async Task SendLocalPosition()
@@ -695,9 +724,9 @@ public class RoverMavLinkConnection : AsyncScript
         var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
             var pos = t.Position;            
-            payload.Lat = LatOffset + (int)(-pos.Z * 100);
-            payload.Lon = LonOffset + (int)(pos.X * 100);
-            payload.Alt = AltOffset + (int)(-pos.Y * 1000);
+            payload.Lat = (int)(SaveMapImageScript.SceneOriginLat * Math.Pow(10, 7) - pos.Z * 100);
+            payload.Lon = (int)(SaveMapImageScript.SceneOriginLon * Math.Pow(10, 7) + pos.X * 100);
+            payload.Alt = (int)(SaveMapImageScript.SceneOriginAlt * 1000 - pos.Y * 1000);
             payload.RelativeAlt = payload.Alt;
 
             var v = rb.LinearVelocity;

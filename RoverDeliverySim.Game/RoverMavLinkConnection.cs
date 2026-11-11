@@ -566,12 +566,12 @@ public class RoverMavLinkConnection : AsyncScript
                     Log.Info("[MAVLink] Requested Autopilot Version");
                     await SendAutopilotVersion();
                     return CommandResult.Accepted;
-                case 395:
-                    throw new NotImplementedException();
-                    return CommandResult.Accepted;
-                case 397:
-                    throw new NotImplementedException();
-                    return CommandResult.Accepted;
+                case 395: // URI pointing to a JSON metadata (old)
+                    return CommandResult.Unsupported;
+                case 397: // URI pointing to a JSON metadata (recent)
+                    return CommandResult.Unsupported;
+                case 280: // GIMBAL_MANAGER_INFORMATION
+                    return CommandResult.Unsupported;
                 case 435: // AVAILABLE_MODES
                     await SendAvailableModes();
                     // AFAICS such Packet is not implemented in asv-mavlink

@@ -5,6 +5,8 @@ using Asv.Mavlink.Ardupilotmega;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Diagnostic;
 using Asv.Mavlink.Minimal;
+using DotNext;
+using Geodesy;
 using R3;
 using RoverDeliverySim.MavlinkExtensions;
 using Stride.Core;
@@ -27,7 +29,7 @@ public class RoverMavLinkConnection : AsyncScript
 {
     // TODO: 
     // - Handle SYSTEM_TIME
-    // - Handle MSG_SET_INTERVAL
+    // - Handle MSG_SET_INTERVAL: Param1 = 242, 245
     // mavproxy --master=udpin:127.0.0.1:14550 --out=udpout:192.168.1.50:14560 [--no-console]
     public int RemotePort = 14550;
     public string RemoteHost = "127.0.0.1";
@@ -38,8 +40,8 @@ public class RoverMavLinkConnection : AsyncScript
     private static readonly MavlinkIdentity MavlinkId = new(1, 1);
     // To disable single sensor:
     // var sensors = Sensors & ~MavSysStatusSensor.MavSysStatusSensorGps;
-    private static readonly MavSysStatusSensor Sensors = 
-        ( MavSysStatusSensor.MavSysStatusPrearmCheck    // Skip arming checks in QGC
+    private static readonly MavSysStatusSensor Sensors =
+        (MavSysStatusSensor.MavSysStatusPrearmCheck    // Skip arming checks in QGC
         | MavSysStatusSensor.MavSysStatusSensor3dGyro
         | MavSysStatusSensor.MavSysStatusSensor3dAccel
         | MavSysStatusSensor.MavSysStatusSensor3dMag
@@ -48,23 +50,23 @@ public class RoverMavLinkConnection : AsyncScript
         | MavSysStatusSensor.MavSysStatusSensorRcReceiver
         );
     private static readonly MavProtocolCapability Capabilities =
-        ( MavProtocolCapability.MavProtocolCapabilityMissionFloat
+        (MavProtocolCapability.MavProtocolCapabilityMissionFloat
         | MavProtocolCapability.MavProtocolCapabilityParamFloat
         | MavProtocolCapability.MavProtocolCapabilityMissionInt
         | MavProtocolCapability.MavProtocolCapabilityCommandInt
         | MavProtocolCapability.MavProtocolCapabilityMavlink2
         //| MavProtocolCapability.MavProtocolCapabilityFtp
-        );    
-    private readonly string[] MUTED_MESSAGES = 
-    { 
-        "ATTITUDE", 
-        "HEARTBEAT", 
-        "GLOBAL_POSITION_INT", 
+        );
+    private readonly string[] MUTED_MESSAGES =
+    {
+        "ATTITUDE",
+        "HEARTBEAT",
+        "GLOBAL_POSITION_INT",
         "LOCAL_POSITION_INT",
         "SYS_STATUS",
         "REQUEST_DATA_STREAM",
         "FILE_TRANSFER_PROTOCOL",
-    }; 
+    };
 
     private static readonly (string, float, MavParamType)[] MAVLINK_PARAMETERS =
     [
@@ -165,7 +167,7 @@ public class RoverMavLinkConnection : AsyncScript
     ];
 
     private new readonly Logger Log = GlobalLogger.GetLogger("MAVLink");
-    private static readonly List<ArduRoverMode> SupportedModes = 
+    private static readonly List<ArduRoverMode> SupportedModes =
     [ ArduRoverMode.Manual
     //, ArduRoverMode.Steering, do we need it?
     , ArduRoverMode.Hold
@@ -177,6 +179,23 @@ public class RoverMavLinkConnection : AsyncScript
     //, ArduRoverMode.Initializing, do we need it??
     ];
 
+    // Are there standard data structures for this?
+    // TODO: Convert to List<T> where T: MavlinkV2Message? and set handlers later in the code
+    // TODO: ConcurrentDict here?
+    private readonly Dictionary<int, (double, Func<RoverMavLinkConnection, Task>)> messageIntervals = new()
+    {
+        [HomePositionPacket.MessageId]      = (1.0, (c) => Task.CompletedTask),
+        [ExtendedSysStatePacket.MessageId]  = (1.0, (c) => Task.CompletedTask),
+        //TODO: set delay for HeartbeatService
+        //[HeartbeatPacket.MessageId]         = (1.0, (c) => Task.CompletedTask), 
+        [LocalPositionNedPacket.MessageId]  = (1.0, (c) => c.SendLocalPosition()),
+        [GlobalPositionIntPacket.MessageId] = (1.0, (c) => c.SendGlobalPosition()),
+        [AttitudePacket.MessageId]          = (1.0, (c) => c.SendAttitude()),
+        [SysStatusPacket.MessageId]         = (1.0, (c) => c.SendSysStatus()),
+    };
+
+    private readonly Dictionary<int, float> messageTimers = [];
+
     private class RoverModeHandler : IWorkModeHandler
     {
         private readonly ArduRoverMode _mode;
@@ -187,7 +206,7 @@ public class RoverMavLinkConnection : AsyncScript
             if (mode is ArduRoverMode roverMode)
             {
                 _mode = roverMode;
-            } 
+            }
             else
             {
                 throw new ArgumentException($"Expected ArduRoverMode, got {mode?.GetType().Name}");
@@ -222,7 +241,7 @@ public class RoverMavLinkConnection : AsyncScript
     {
         var tcs = new TaskCompletionSource();
         _cts = new CancellationTokenSource();
-        _cts.Token.Register(() => tcs.TrySetCanceled());        
+        _cts.Token.Register(() => tcs.TrySetCanceled());
 
         var messageFactory = MavlinkV2Protocol.CreateMessageFactory();
         var protocol = Protocol.Create(builder =>
@@ -284,7 +303,6 @@ public class RoverMavLinkConnection : AsyncScript
         await SetupHeartbeatService();
         await SetupParamsService();
         await SetupCommandService();
-        await SetupCommandService();        
         await SetupMissionService();
         await SetupStatusService();
         await SetupModeService();
@@ -296,18 +314,21 @@ public class RoverMavLinkConnection : AsyncScript
         // HEARTBEAT, SYS_STATUS: 1 Hz
         // GLOBAL_POSITION_INT, LOCAL_POSITION_NED: 2-5 Hz
         // ATTITUDE: 10-20 Hz
-        float dt = 0f;
+        foreach (var k in messageIntervals.Keys)
+        {
+            messageTimers[k] = 0f;
+        }
 
         while (Game.IsRunning && !_cts.IsCancellationRequested)
         {
-            dt += (float)Game.UpdateTime.Elapsed.TotalSeconds;
-            if (dt >= 0.1f)
+            foreach (var k in messageIntervals.Keys)
             {
-                dt = 0f;
-                //await SendLocalPosition();
-                await SendGlobalPosition();
-                await SendAttitude();
-                await SendSysStatus();
+                messageTimers[k] += (float)Game.UpdateTime.Elapsed.TotalSeconds;
+                var (interval, handler) = messageIntervals[k];
+                if(messageTimers[k] >= interval)
+                {
+                    await handler(arg: this);
+                }
             }
             await Script.NextFrame();
         }
@@ -540,7 +561,7 @@ public class RoverMavLinkConnection : AsyncScript
 
     private async Task SetupCommandService()
     {
-        
+
         var commandIntService = _serverDevice.GetCommandIntEx();
         if (!commandIntService.IsInit) await commandIntService.Init(_cts.Token);
         commandIntService[MavCmd.MavCmdGetHomePosition] = async (id, packet, ct) =>
@@ -574,13 +595,12 @@ public class RoverMavLinkConnection : AsyncScript
                     return CommandResult.Unsupported;
                 case 435: // AVAILABLE_MODES
                     await SendAvailableModes();
-                    // AFAICS such Packet is not implemented in asv-mavlink
                     return CommandResult.Accepted;
                 default:
                     Log.Info($"Requested unhandled message {messageId}");
                     return CommandResult.Unsupported;
             }
-            
+
         };
         commandLongService[MavCmd.MavCmdRequestAutopilotCapabilities] = async (id, packet, ct) =>
         {
@@ -604,12 +624,25 @@ public class RoverMavLinkConnection : AsyncScript
             // so the previous mode remains in outgoing heartbeats;
             // Which is quite bizarre TBH
             await modeService.SetMode(mode, null, _cts.Token);
-            
+
             // NB: hbService.SetCustomMode() is a utility function used
             // with firmwares that pack multiple bits inside CustomMode msg, e.g. PX4.
             var hbService = _serverDevice.GetHeartbeat();
             hbService.Set(mode.Fill);
             Log.Info($"[MAVLink] Changed mode to {mode.Name}");
+            return CommandResult.Accepted;
+        };
+        commandLongService[MavCmd.MavCmdSetMessageInterval] = async (id, packet, ct) =>
+        {
+            var messageId = (int)packet.Payload.Param1;
+            if (!messageIntervals.ContainsKey(messageId))
+            {
+                Log.Warning($"Requested to set interval for unsupported message {messageId}");
+                return CommandResult.Unsupported;
+            }
+            var handler = messageIntervals[messageId].Item2;
+            var interval = (double)packet.Payload.Param2;
+            messageIntervals[messageId] = (interval, handler);
             return CommandResult.Accepted;
         };
         commandLongService.Start();
@@ -642,7 +675,7 @@ public class RoverMavLinkConnection : AsyncScript
     private async Task SetupMissionService()
     {
         var missionServiceEx = _serverDevice.GetMissionEx();
-        
+
         var missionService = missionServiceEx.Base;
         //var missionService = _serverDevice.GetMission();
 
@@ -745,15 +778,16 @@ public class RoverMavLinkConnection : AsyncScript
     private async Task SetupModeService()
     {
         var modeService = _serverDevice.GetMode();
-        if (!modeService.IsInit) await modeService.Init(_cts.Token);        
+        if (!modeService.IsInit) await modeService.Init(_cts.Token);
 
         //await modeService.SetMode(ArduCopterMode.Loiter, handler =>
         //{
         //    Console.WriteLine("Mode change requested: Loiter");
         //    // optional: configure handler / initial state
         //});
-        modeService.CurrentMode.Subscribe(modeHandler => { 
-            Log.Info($"Current mode changed: {modeHandler.Mode.Name}"); 
+        modeService.CurrentMode.Subscribe(modeHandler =>
+        {
+            Log.Info($"Current mode changed: {modeHandler.Mode.Name}");
         });
 
         modeService.Start();
@@ -761,7 +795,7 @@ public class RoverMavLinkConnection : AsyncScript
         Log.Info($"Started modes microservice. Supported modes: {modesList}");
     }
 
-    private async Task SendLocalPosition()
+    protected async Task SendLocalPosition()
     {
         var packet = createPacket<LocalPositionNedPacket, LocalPositionNedPayload>((payload, t, rb) =>
         {
@@ -777,11 +811,11 @@ public class RoverMavLinkConnection : AsyncScript
         await _serverDevice.Context.Connection.Send(packet);
     }
 
-    private async Task SendGlobalPosition()
+    protected async Task SendGlobalPosition()
     {
         var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
-            var pos = t.Position;            
+            var pos = t.Position;
             payload.Lat = (int)(SaveMapImageScript.SceneOriginLat * Math.Pow(10, 7) - pos.Z * 100);
             payload.Lon = (int)(SaveMapImageScript.SceneOriginLon * Math.Pow(10, 7) + pos.X * 100);
             payload.Alt = (int)(SaveMapImageScript.SceneOriginAlt * 1000 - pos.Y * 1000);
@@ -803,7 +837,7 @@ public class RoverMavLinkConnection : AsyncScript
         await _serverDevice.Context.Connection.Send(packet);
     }
 
-    private async Task SendAttitude()
+    protected async Task SendAttitude()
     {
         var packet = createPacket<AttitudePacket, AttitudePayload>((payload, t, rb) =>
         {
@@ -825,9 +859,10 @@ public class RoverMavLinkConnection : AsyncScript
         await _serverDevice.Context.Connection.Send(packet);
     }
 
-    private async Task SendSysStatus()
+    protected async Task SendSysStatus()
     {
-        var packet = createPacket<SysStatusPacket, SysStatusPayload>((payload, t, rb) => {
+        var packet = createPacket<SysStatusPacket, SysStatusPayload>((payload, t, rb) =>
+        {
             payload.OnboardControlSensorsPresent = Sensors;
             payload.OnboardControlSensorsEnabled = Sensors;
             payload.OnboardControlSensorsHealth = Sensors;
@@ -845,12 +880,13 @@ public class RoverMavLinkConnection : AsyncScript
         await _serverDevice.Context.Connection.Send(packet);
     }
 
-    private async Task SendAutopilotVersion()
+    protected async Task SendAutopilotVersion()
     {
-        var packet = createPacket<AutopilotVersionPacket, AutopilotVersionPayload>((payload, t, rb) => {            
+        var packet = createPacket<AutopilotVersionPacket, AutopilotVersionPayload>((payload, t, rb) =>
+        {
             payload.Capabilities = Capabilities;
             // Bypassing qgc irrelevant firmware warning:
-            payload.FlightSwVersion = 0x04070200;  
+            payload.FlightSwVersion = 0x04070200;
             payload.Uid = 123456789L;
             payload.BoardVersion = 0;
             payload.VendorId = 0;

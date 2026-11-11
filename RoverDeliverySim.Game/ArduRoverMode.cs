@@ -5,9 +5,12 @@ using System.Linq;
 using Asv.Mavlink.Ardupilotmega;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Minimal;
+using Asv.Mavlink;
 using DotNext.Collections.Generic;
 
-namespace Asv.Mavlink;
+#nullable enable
+
+namespace RoverDeliverySim.MavlinkExtensions;
 
 // TODO: Pull request to asv-mavlink/src/Asv.Mavlink/Devices/Client/Vehicles/Ardu/
 public class ArduRoverMode : ICustomMode
@@ -52,6 +55,20 @@ public class ArduRoverMode : ICustomMode
     {
         return AllModes.FirstOrDefault(m => (ulong)m.CustomMode == (ulong)n);
     }
+    public byte ToStandardMode()
+    {
+        return CustomMode switch
+        {
+            RoverMode.RoverModeAuto     => 6, // Auto       -> MISSION
+            RoverMode.RoverModeGuided   => 6, // Guided     -> MISSION
+            RoverMode.RoverModeRtl      => 5, // RTL        -> SAFE_RECOVERY 
+            RoverMode.RoverModeSmartRtl => 5, // Smart RTL  -> SAFE_RECOVERY
+            RoverMode.RoverModeHold     => 1, // Hold       -> POSITION_HOLD
+            RoverMode.RoverModeLoiter   => 1, // Loiter     -> POSITION_HOLD
+            _                           => 0  // ...        -> NON_STANDARD
+        };
+    }
+
 
     public static readonly ArduRoverMode Unknown = new("Unknown", "Unknown rover mode", true, MavModeFlag.MavModeFlagCustomModeEnabled, (RoverMode)uint.MaxValue);
     /// <summary>

@@ -1,4 +1,5 @@
 <Solution>
+  <Folder Name="/Solution Items/" />
   <Project Path="RoverDeliverySim.Game/RoverDeliverySim.Game.csproj" />
-  <Project Path="RoverDeliverySim.Windows/RoverDeliverySim.Windows.csproj" DefaultStartup="true" />
+  <Project Path="RoverDeliverySim.Windows/RoverDeliverySim.Windows.csproj" />
 </Solution>

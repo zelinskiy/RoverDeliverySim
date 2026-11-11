@@ -6,6 +6,7 @@ using Asv.Mavlink.Common;
 using Asv.Mavlink.Diagnostic;
 using Asv.Mavlink.Minimal;
 using R3;
+using RoverDeliverySim.MavlinkExtensions;
 using Stride.Core;
 using Stride.Core.Diagnostics;
 using Stride.Core.Mathematics;
@@ -13,9 +14,11 @@ using Stride.Engine;
 using Stride.Physics;
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using static System.Net.Mime.MediaTypeNames;
 using MavCmd = Asv.Mavlink.Common.MavCmd;
 
 namespace RoverDeliverySim;
@@ -161,6 +164,19 @@ public class RoverMavLinkConnection : AsyncScript
         ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32),
     ];
 
+    private new readonly Logger Log = GlobalLogger.GetLogger("MAVLink");
+    private static readonly List<ArduRoverMode> SupportedModes = 
+    [ ArduRoverMode.Manual
+    //, ArduRoverMode.Steering, do we need it?
+    , ArduRoverMode.Hold
+    , ArduRoverMode.Guided
+    , ArduRoverMode.Auto
+    , ArduRoverMode.Follow
+    , ArduRoverMode.Rtl
+    , ArduRoverMode.SmartRtl
+    //, ArduRoverMode.Initializing, do we need it??
+    ];
+
     private class RoverModeHandler : IWorkModeHandler
     {
         private readonly ArduRoverMode _mode;
@@ -246,16 +262,7 @@ public class RoverMavLinkConnection : AsyncScript
 
                 builder.RegisterMode(
                     ArduRoverMode.Hold,
-                    [ ArduRoverMode.Manual
-                    //, ArduRoverMode.Steering, do we need it?
-                    , ArduRoverMode.Hold
-                    , ArduRoverMode.Guided
-                    , ArduRoverMode.Auto
-                    , ArduRoverMode.Follow
-                    , ArduRoverMode.Rtl
-                    , ArduRoverMode.SmartRtl
-                    //, ArduRoverMode.Initializing, do we need it??
-                    ],
+                    SupportedModes,
                     mode => new RoverModeHandler(Log, mode)
                 );
 
@@ -377,7 +384,7 @@ public class RoverMavLinkConnection : AsyncScript
                 }
                 else if (msg is CommandLongPacket cmdLong)
                 {
-                    Log.Info($"Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
+                    Log.Info($"[MAVLink] Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
                         $"Params: {cmdLong.Payload.Param1}:" +
                         $"{cmdLong.Payload.Param2}:" +
                         $"{cmdLong.Payload.Param3}:" +
@@ -388,7 +395,7 @@ public class RoverMavLinkConnection : AsyncScript
                 }
                 else if (msg is CommandIntPacket cmdInt)
                 {
-                    Log.Info($"Mavlink CMD_LONG: {cmdInt.Payload.Command}, " +
+                    Log.Info($"[MAVLink] Mavlink CMD_INT: {cmdInt.Payload.Command}, " +
                         $"Params: {cmdInt.Payload.Param1}:" +
                         $"{cmdInt.Payload.Param2}:" +
                         $"{cmdInt.Payload.Param3}:" +
@@ -556,8 +563,18 @@ public class RoverMavLinkConnection : AsyncScript
             switch (messageId)
             {
                 case AutopilotVersionPacket.MessageId:
-                    Log.Info("Requested Autopilot Version");
+                    Log.Info("[MAVLink] Requested Autopilot Version");
                     await SendAutopilotVersion();
+                    return CommandResult.Accepted;
+                case 395:
+                    throw new NotImplementedException();
+                    return CommandResult.Accepted;
+                case 397:
+                    throw new NotImplementedException();
+                    return CommandResult.Accepted;
+                case 435: // AVAILABLE_MODES
+                    await SendAvailableModes();
+                    // AFAICS such Packet is not implemented in asv-mavlink
                     return CommandResult.Accepted;
                 default:
                     Log.Info($"Requested unhandled message {messageId}");
@@ -596,6 +613,30 @@ public class RoverMavLinkConnection : AsyncScript
             return CommandResult.Accepted;
         };
         commandLongService.Start();
+    }
+
+    private async Task SendAvailableModes()
+    {
+        var modeService = _serverDevice.GetMode();
+        List<ArduRoverMode> modes = SupportedModes;
+
+        for (int i = 0; i < SupportedModes.Count; i++)
+        {
+            var mode = SupportedModes[i];
+            var packet = createPacket<AvailableModesPacket, AvailableModesPayload>((payload, t, rb) =>
+            {
+                payload.StandardMode = mode.ToStandardMode();
+                payload.CustomMode = (uint)mode.CustomMode;
+                payload.ModeIndex = (byte)(i + 1);
+                payload.NumberModes = (byte)modes.Count;
+                payload.Properties = 0;
+
+                Array.Clear(payload.ModeName, 0, payload.ModeName.Length);
+                System.Text.Encoding.ASCII.GetBytes(mode.Name).AsSpan().CopyTo(payload.ModeName);
+            });
+
+            await _serverDevice.Context.Connection.Send(packet);
+        }
     }
 
     private async Task SetupMissionService()

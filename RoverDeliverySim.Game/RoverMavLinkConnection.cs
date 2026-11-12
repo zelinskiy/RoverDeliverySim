@@ -34,6 +34,7 @@ public class RoverMavLinkConnection : AsyncScript
     // - Handle SYSTEM_TIME
     // - Handle MSG_SET_INTERVAL: Param1 = 242, 245
     // mavproxy --master=udpin:127.0.0.1:14550 --out=udpout:192.168.1.50:14560 [--no-console]
+    public event Action OnMissionReceived;
     public int RemotePort = 14550;
     public string RemoteHost = "127.0.0.1";
     public int LocalPort = 14560;
@@ -359,8 +360,8 @@ public class RoverMavLinkConnection : AsyncScript
 
     private IProtocolRouter SetupRouter(IProtocolFactory protocol)
     {
-        Log.Info($"[MAVLink] Listening on {LocalHost}:{LocalPort} (Rover)");
-        Log.Info($"[MAVLink] Sending to {RemoteHost}:{RemotePort} (GCS)");
+        Log.Info($"Listening on {LocalHost}:{LocalPort} (Rover)");
+        Log.Info($"Sending to {RemoteHost}:{RemotePort} (GCS)");
 
         var router = protocol.CreateRouter("ROUTER");
         router.AddUdpPort(p =>
@@ -376,12 +377,12 @@ public class RoverMavLinkConnection : AsyncScript
             port.EndpointAdded.Subscribe(ep =>
             {
                 if (ep.GetPortId() == LocalPort.ToString()) return;
-                Log.Info($"[MAVLink] Endpoint added: {ep.DisplayName}");
+                Log.Info($"Endpoint added: {ep.DisplayName}");
             });
             port.EndpointRemoved.Subscribe(ep =>
             {
                 if (ep.GetPortId() == LocalPort.ToString()) return;
-                Log.Info($"[MAVLink] Endpoint removed: {ep.DisplayName}");
+                Log.Info($"Endpoint removed: {ep.DisplayName}");
             });
         }
 
@@ -394,7 +395,7 @@ public class RoverMavLinkConnection : AsyncScript
             }
             if (msg is MavlinkV2Message mavlinkMsg && mavlinkMsg.FullId != MavlinkId)
             {
-                Log.Info($"[MAVLink] Received {mavlinkMsg.Name} from ({mavlinkMsg.SystemId}, {mavlinkMsg.ComponentId})");
+                Log.Info($"Received {mavlinkMsg.Name} from ({mavlinkMsg.SystemId}, {mavlinkMsg.ComponentId})");
                 if (msg is FileTransferProtocolPacket ftpPacket)
                 {
                     // Unfortunately suppressing
@@ -412,7 +413,7 @@ public class RoverMavLinkConnection : AsyncScript
                 }
                 else if (msg is CommandLongPacket cmdLong)
                 {
-                    Log.Info($"[MAVLink] Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
+                    Log.Info($"Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
                         $"Params: {cmdLong.Payload.Param1}:" +
                         $"{cmdLong.Payload.Param2}:" +
                         $"{cmdLong.Payload.Param3}:" +
@@ -423,7 +424,7 @@ public class RoverMavLinkConnection : AsyncScript
                 }
                 else if (msg is CommandIntPacket cmdInt)
                 {
-                    Log.Info($"[MAVLink] Mavlink CMD_INT: {cmdInt.Payload.Command}, " +
+                    Log.Info($"Mavlink CMD_INT: {cmdInt.Payload.Command}, " +
                         $"Params: {cmdInt.Payload.Param1}:" +
                         $"{cmdInt.Payload.Param2}:" +
                         $"{cmdInt.Payload.Param3}:" +
@@ -443,7 +444,7 @@ public class RoverMavLinkConnection : AsyncScript
                 {
                     Log.Info($"Sent status msg [{statusMsg.Payload.Severity}]: {string.Concat(statusMsg.Payload.Text)}");
                 }
-                Log.Info($"[MAVLink] Transmitted {msg.Name}");
+                Log.Info($"Transmitted {msg.Name}");
             }
         });
         return router;
@@ -509,23 +510,12 @@ public class RoverMavLinkConnection : AsyncScript
         heartbeatService.Set(hb =>
         {
             var modeService = _serverDevice.GetMode();
-            modeService.CurrentMode.CurrentValue.Mode.GetCommandLongArgs(
-                out var baseMode,
-                out var customMode,
-                out var customSubMode
-            );
             modeService.CurrentMode.CurrentValue.Mode.Fill(hb);
-            //Log.Info($"Current mode: {modeService.CurrentMode.CurrentValue.Mode.Name}; {baseMode}:{customMode}");
-
-            //MavMode.
+            
             hb.Type = MavType.MavTypeGroundRover;
             // QGC has hardcoded mode flags from Ardupilot
             //hb.Autopilot = MavAutopilot.MavAutopilotArdupilotmega;
             hb.Autopilot = MavAutopilot.MavAutopilotArdupilotmega;
-            //hb.BaseMode = (MavModeFlag)baseMode;
-            //hb.BaseMode = MavModeFlag.MavModeFlagCustomModeEnabled;
-            // Bit flags: can add e.g. | MavModeFlag.MavModeFlagSafetyArmed;
-            //hb.CustomMode = 4;
             hb.SystemStatus = MavState.MavStateActive;
             hb.MavlinkVersion = 3;
         });
@@ -574,12 +564,12 @@ public class RoverMavLinkConnection : AsyncScript
         if (!commandIntService.IsInit) await commandIntService.Init(_cts.Token);
         commandIntService[MavCmd.MavCmdGetHomePosition] = async (id, packet, ct) =>
         {
-            Log.Info("[MAVLink] Get home called");
+            Log.Info("Get home called");
             return CommandResult.Accepted;
         };
         commandIntService[MavCmd.MavCmdDoSetHome] = async (id, packet, ct) =>
         {
-            Log.Info("[MAVLink] Set home called");
+            Log.Info("Set home called");
             return CommandResult.Accepted;
         };
         commandIntService.Start();
@@ -592,7 +582,7 @@ public class RoverMavLinkConnection : AsyncScript
             switch (messageId)
             {
                 case AutopilotVersionPacket.MessageId:
-                    Log.Info("[MAVLink] Requested Autopilot Version");
+                    Log.Info("Requested Autopilot Version");
                     await SendAutopilotVersion();
                     return CommandResult.Accepted;
                 case 395: // URI pointing to a JSON metadata (old)
@@ -617,13 +607,13 @@ public class RoverMavLinkConnection : AsyncScript
         };
         commandLongService[MavCmd.MavCmdDoSetMode] = async (id, packet, ct) =>
         {
-            Log.Info("[MAVLink] Set mode called (LONG)");
+            Log.Info("Set mode called (LONG)");
             var modeService = _serverDevice.GetMode();
             var mode_code = (int)packet.Payload.Param2;
             var mode = ArduRoverMode.FromInt(mode_code);
             if (mode is null || !modeService.AvailableModes.Contains(mode))
             {
-                Log.Info($"[MAVLink] Bad mode: {mode_code}");
+                Log.Info($"Bad mode: {mode_code}");
                 return CommandResult.Denied;
             }
             // From the docs (ModeServer.md):
@@ -637,7 +627,7 @@ public class RoverMavLinkConnection : AsyncScript
             // with firmwares that pack multiple bits inside CustomMode msg, e.g. PX4.
             var hbService = _serverDevice.GetHeartbeat();
             hbService.Set(mode.Fill);
-            Log.Info($"[MAVLink] Changed mode to {mode.Name}");
+            Log.Info($"Changed mode to {mode.Name}");
             return CommandResult.Accepted;
         };
         commandLongService[MavCmd.MavCmdSetMessageInterval] = async (id, packet, ct) =>
@@ -658,8 +648,25 @@ public class RoverMavLinkConnection : AsyncScript
             {
                 Log.Warning($"Requested to set interval for unsupported message {messageId}");
                 return CommandResult.Unsupported;
-            }
-            
+            }            
+        };
+        commandLongService[MavCmd.MavCmdComponentArmDisarm] = async (id, packet, ct) =>
+        {
+            var armed = packet.Payload.Param1 == 1;
+            Log.Info($"Arm/disarm requested: {packet.Payload.Param1}");
+            var hbService = _serverDevice.GetHeartbeat();
+            hbService.Set(hb =>
+            {
+                if (armed)
+                {
+                    hb.BaseMode |= MavModeFlag.MavModeFlagSafetyArmed;
+                }
+                else
+                {
+                    hb.BaseMode &= ~MavModeFlag.MavModeFlagSafetyArmed;
+                }                
+            });
+            return CommandResult.Accepted;
         };
         commandLongService.Start();
     }

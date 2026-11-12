@@ -27,14 +27,46 @@ using MavCmd = Asv.Mavlink.Common.MavCmd;
 namespace RoverDeliverySim;
 
 
+// Controller -> Connection
+public abstract record ControllerMsg
+{
+    public sealed record WaypointReached(ushort Seq) : ControllerMsg;
+    public sealed record Fail(string Reason) : ControllerMsg;
+}
 
+// Connection -> Controller
+public abstract record ConnectionMsg
+{
+    public sealed record MissionReceived(IReadOnlyList<MissionItem> Items) : ConnectionMsg;
+    public sealed record StartMission : ConnectionMsg;
+    public sealed record ChangeWaypoint(ushort Seq) : ConnectionMsg;
+}
+public sealed class MissionBus
+{
+    private readonly Subject<ControllerMsg> _fromController = new();
+    private readonly Subject<ConnectionMsg> _fromConnection = new();
+
+    public Observable<ControllerMsg> FromController => _fromController;
+    public Observable<ConnectionMsg> FromConnection => _fromConnection;
+
+    public void Send(ControllerMsg m) => _fromController.OnNext(m);
+    public void Send(ConnectionMsg m) => _fromConnection.OnNext(m);
+}
+
+
+// TODO: Move all mission-related mavlink stuff in a separate component
 public class RoverMavLinkConnection : AsyncScript
 {
     // TODO: 
     // - Handle SYSTEM_TIME
     // - Handle MSG_SET_INTERVAL: Param1 = 242, 245
     // mavproxy --master=udpin:127.0.0.1:14550 --out=udpout:192.168.1.50:14560 [--no-console]
-    public event Action OnMissionReceived;
+
+    // Events used to communicate with RoverController:
+    public MissionBus MissionBusAdapter { get; } = new();
+
+    // TODO: private class UDPConfig
+    // UDP configuration:
     public int RemotePort = 14550;
     public string RemoteHost = "127.0.0.1";
     public int LocalPort = 14560;
@@ -47,6 +79,7 @@ public class RoverMavLinkConnection : AsyncScript
     //);
     private MavlinkHeartbeatServerConfig _heartbeatConfig;
     private CancellationTokenSource _cts;
+    // TODO: Move all this stuff to a separate static class.
     private static readonly MavlinkIdentity MavlinkId = new(1, 1);
     // To disable single sensor:
     // var sensors = Sensors & ~MavSysStatusSensor.MavSysStatusSensorGps;
@@ -247,7 +280,6 @@ public class RoverMavLinkConnection : AsyncScript
 
         }
     }
-
 
     public override async Task Execute()
     {
@@ -705,12 +737,41 @@ public class RoverMavLinkConnection : AsyncScript
         // --- CHANGE ACTIVE ITEM ---
         // COMMAND_LONG (MAV_CMD_DO_SET_MISSION_CURRENT) -> COMMAND_ACK + MISSION_CURRENT (Broadcast)
 
-        missionServiceEx[MavCmd.MavCmdDoSetMissionCurrent] = async (item, ct) =>
+        //missionServiceEx[MavCmd.MavCmdDoSetMissionCurrent] = async (item, ct) =>
+        //{
+        //    Log.Info($"Mission SET_CURRENT {item.Seq}");
+        //    await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted);
+        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        //    await missionService.SendMissionCurrent(item.Seq);
+        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        //};
+        missionServiceEx[MavCmd.MavCmdNavWaypoint] = async (item, ct) =>
         {
-            Log.Info($"Mission SET_CURRENT {item.Seq}");
-            await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted);
-            await missionService.SendMissionCurrent(item.Seq);
+            Log.Info($"Mission NAV_WAYPOINT_{item.Seq} ({item.X}, {item.Y})");
+            var result = MissionBusAdapter.FromController
+                .Where(m =>
+                    m is ControllerMsg.Fail
+                    || m is ControllerMsg.WaypointReached r
+                    && r.Seq == item.Seq
+                ).FirstAsync(ct);
+            MissionBusAdapter.Send(new ConnectionMsg.ChangeWaypoint(item.Seq));
+            if (await result is ControllerMsg.Fail f)
+                throw new InvalidOperationException(f.Reason);
         };
+        missionServiceEx[MavCmd.MavCmdMissionStart] = async (item, ct) =>
+        {
+            Log.Info($"Mission START");
+            missionService.Start();
+            MissionBusAdapter.Send(new ConnectionMsg.StartMission());
+            //await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            // TODO: send MAV_RESULT_ACCEPTED? Or is it done by mission service?
+        };
+        //missionServiceEx[MavCmd.MavCmdNavReturnToLaunch] = async (item, ct) =>
+        //{
+        //    Log.Info($"Mission RTL");
+        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        //};
+        //missionServiceEx.Reached.
 
         await missionServiceEx.Init(_cts.Token);
         missionServiceEx.Start();

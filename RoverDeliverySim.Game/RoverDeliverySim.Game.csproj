@@ -2,8 +2,14 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>RoverDeliverySim</RootNamespace>
+	<Nullable>enable</Nullable>
+	<AnalysisLevel>latest</AnalysisLevel>
+	<!--<TreatWarningsAsErrors>true</TreatWarningsAsErrors>-->
+	<AnalysisMode>All</AnalysisMode>
+	<EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
   </PropertyGroup>
   <ItemGroup>
+    <PackageReference Include="Asv.Mavlink" Version="4.4.4" />
     <PackageReference Include="Stride.Engine" Version="4.4.1" />
     <PackageReference Include="Stride.Video" Version="4.4.1" />
     <PackageReference Include="Stride.Physics" Version="4.4.1" />

@@ -9,8 +9,9 @@ Hierarchy:
         - ref!! 0353d0ee-edb8-4066-9d71-b77cb03135aa
         - ref!! af112fa1-94b6-47b1-ad49-9eb0ca1fd288
         - ref!! bcdec293-0c01-4bbf-87dd-f8bf083617a1
-        - ref!! 46938bba-05fc-46d8-938e-3ee80d2cc5d5
+        - ref!! ddcfa817-d170-4991-8257-5292ceda03f1
         - ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
+        - ref!! 46938bba-05fc-46d8-938e-3ee80d2cc5d5
         - ref!! e8e1e927-81fb-4953-ae31-19f6c272fd1a
         - ref!! 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
         - ref!! f01127ce-1bdd-4ff0-a197-ee3e5357817b
@@ -24,8 +25,8 @@ Hierarchy:
                 Components:
                     a3294146fd186c7e2c4ba3f89c23bda9: !TransformComponent
                         Id: f7dec451-ab07-4506-8977-65e7d2bca1c7
-                        Position: {X: 0.0, Y: 2.0, Z: 0.0}
-                        Rotation: {X: 1.131334E-08, Y: -0.9659258, Z: -0.25881904, W: -4.222196E-08}
+                        Position: {X: 0.0, Y: 15.0, Z: 0.0}
+                        Rotation: {X: 1.3425392E-08, Y: 0.7933533, Z: 0.6087614, W: 1.4328332E-08}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     1392ba253a6ff62041052ab2bd43f031: !LightComponent
@@ -58,11 +59,13 @@ Hierarchy:
                         Id: ae569d9f-fc04-4746-a3a8-a0ab4ca9f556
                         Model: 8f8ee9bf-c8a2-4630-93f1-e48ad84e9647:Models/Rover
                         Materials: {}
-                    b2e494f7b4c17851630d05f04ec1e758: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
+                    685a1aee78d9c0b35d681fff16e4dee4: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
+                        Mission: null
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
                         NavNetwork: ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
+                        MissionWaypointTemplate: null
                         TargetPosition: {X: 0.0, Y: 0.0, Z: 0.0}
                     feccb45ae0047ebd110ef237a98adc3a: !RigidbodyComponent
                         Id: a0e1f282-d754-462a-91c3-8583050d2c3d
@@ -86,6 +89,12 @@ Hierarchy:
                                 Radius: 0.15
                                 LocalOffset: {X: 0.0, Y: 0.15, Z: 0.0}
                                 LocalRotation: {X: 0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
+                    590bb1cc72dde64488558361be68b096: !RoverDeliverySim.RoverMavLinkConnection,RoverDeliverySim.Game
+                        Id: 0b30d2a0-dd8d-4e97-a990-b8a4121556f9
+                        RemotePort: 14550
+                        RemoteHost: 127.0.0.1
+                        LocalPort: 14560
+                        LocalHost: 127.0.0.1
         -   Folder: null
             Entity:
                 Id: 192d4ba6-afe0-4940-ab85-4ac1eb492c3e
@@ -93,7 +102,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 93005a95-d2d4-4c31-a325-11b761c5809f
-                        Position: {X: 2.9759824, Y: 0.15, Z: 0.98518854}
+                        Position: {X: 2.2943282, Y: 0.15, Z: -7.3598614}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -110,7 +119,7 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: f097b3d6-4351-45fd-9f5f-fc66c72b4ff8
-                        Position: {X: -3.5647194, Y: 0.0, Z: 2.6493163}
+                        Position: {X: -13.39603, Y: 0.0, Z: -6.8239307}
                         Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}
@@ -126,7 +135,7 @@ Hierarchy:
                         Id: 567ea7cd-968f-4be2-aa13-1adc2b743d24
                         Position: {X: 0.0, Y: 0.0, Z: 0.0}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
-                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Scale: {X: 3.0, Y: 1.0, Z: 3.0}
                         Children: {}
                     deb336a23085d13904bc8d091ff606d6: !ModelComponent
                         Id: 6878b5e1-0b12-4067-b184-955e2ff3d4b3
@@ -153,7 +162,7 @@ Hierarchy:
                 Components:
                     0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
                         Id: 517b1cf0-0e8f-4080-8331-f58eeda88b50
-                        Position: {X: -1.7061645, Y: 0.15, Z: -2.8132713}
+                        Position: {X: -11.578671, Y: 0.15, Z: -6.869694}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 0.25, Y: 0.25, Z: 0.25}
                         Children: {}
@@ -175,7 +184,6 @@ Hierarchy:
                         Children:
                             b6aea4526773a2eb04da57403f24f403: ref!! 3439da35-7380-4546-93ad-d4bce9090a87
                             e341da901005e49e7108f03895aa4fbc: ref!! 93005a95-d2d4-4c31-a325-11b761c5809f
-                            494fdb057b50112a3a07d60c8acc59d0: ref!! d4259c41-8d8e-4723-be3d-536a6f7dad6d
                             35ca93934679d7ddf9ee85661d85f344: ref!! 517b1cf0-0e8f-4080-8331-f58eeda88b50
         -   Entity:
                 Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
@@ -183,7 +191,7 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: f26e3a55-12f8-4c31-845a-ecbf72589bc2
-                        Position: {X: -3.5647194, Y: 0.0, Z: -2.8019505}
+                        Position: {X: -13.39603, Y: 0.0, Z: -12.823931}
                         Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}
@@ -191,23 +199,6 @@ Hierarchy:
                         Id: 59ea7302-1ddb-4954-926c-530cea8038b8
                         Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
                         Materials: {}
-        -   Folder: null
-            Entity:
-                Id: 81443f9d-1ac8-4652-acb8-72440edb4a10
-                Name: NavPoint3
-                Components:
-                    0ff68b107270efac8b4edb5edeb135a5: !TransformComponent
-                        Id: d4259c41-8d8e-4723-be3d-536a6f7dad6d
-                        Position: {X: -1.862088, Y: 0.15, Z: 1.0182693}
-                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
-                        Scale: {X: 0.25, Y: 0.25, Z: 0.25}
-                        Children: {}
-                    21a8309fd43a197b092213e8c068984c: !ModelComponent
-                        Id: f03fdb08-cbcf-4af7-a4ea-21d0e59c6660
-                        Model: bbe512fd-61c5-42d9-b492-e0d9719efa03:Models/Sphere
-                        IsShadowCaster: false
-                        Materials:
-                            54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
         -   Entity:
                 Id: 96113b1a-feae-4e46-a4f8-a7d69fa37243
                 Name: NavPoint1
@@ -247,8 +238,8 @@ Hierarchy:
                 Components:
                     72d9ed7a4190b5acd05770ad5b84fb19: !TransformComponent
                         Id: 36883066-2892-431f-a3d3-1ed62c2c909d
-                        Position: {X: 6.6640034, Y: 4.0426106, Z: -0.54442215}
-                        Rotation: {X: -0.14114946, Y: 0.7273797, Z: 0.19321674, W: 0.6431666}
+                        Position: {X: 10.183172, Y: 7.2123456, Z: -6.240386}
+                        Rotation: {X: -0.15644962, Y: 0.7838673, Z: 0.20979157, W: 0.5630838}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     441a482c7831e90753a74c30ee109f75: !CameraComponent
@@ -256,11 +247,34 @@ Hierarchy:
                         Name: null
                         Projection: Perspective
                         Slot: 2a651fd0-7ab3-43f0-8de2-d478e7229652
-                    188b985edffde6d3ab08ae635c109d3e: !RoverDeliverySim.GroundClicker,RoverDeliverySim.Game
+                    6fc8973adc6ca8b6f405c7c4dbb2fa12: !RoverDeliverySim.GroundClicker,RoverDeliverySim.Game
                         Id: 3032e2b1-26a8-461e-afce-bbe5427df5b1
                         Camera: ref!! 82702b9c-edcd-4e99-943b-0dd2bfdcbb0e
                         MouseClickSphere: ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
                         Rover: ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
+        -   Entity:
+                Id: ddcfa817-d170-4991-8257-5292ceda03f1
+                Name: MapViewCamera
+                Components:
+                    71f34de0899539fa8f207d717ce1484e: !TransformComponent
+                        Id: 2a70b0d9-873b-47b1-9ad8-7adce40dbb8c
+                        Position: {X: 0.0, Y: 15.0, Z: 0.0}
+                        Rotation: {X: -0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
+                    4d95f33899191b213bac9f578970099b: !CameraComponent
+                        Id: 3942b265-4992-4432-aff1-f84e5c63b9f6
+                        Name: null
+                        Projection: Orthographic
+                        OrthographicSize: 30.0
+                        UseCustomAspectRatio: true
+                        AspectRatio: 1.0
+                        Slot: aa64ca60-45ba-479a-9a64-0944ddf82284
+                    42e64befcec6dbc6d1ad9c3035b6b6ab: !.SaveMapImageScript,RoverDeliverySim.Game
+                        Id: 9fc9da21-b59e-41c6-8bbb-6fb0ead7b6c9
+                        RenderTargetAsset: a02651e2-abce-4042-8600-8b53d40f4d1c:Models/Textures/RenderTexture
+                    5e1c42945a918a69529ec335cad7c146: !RoverDeliverySim.TileServer,RoverDeliverySim.Game
+                        Id: 7537d606-1912-4ec1-9cd6-ffb0b0b1aad0
         -   Entity:
                 Id: e8e1e927-81fb-4953-ae31-19f6c272fd1a
                 Name: Pharmacy
@@ -282,7 +296,7 @@ Hierarchy:
                 Components:
                     ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
                         Id: fe9149ff-0d6e-456d-9d70-e1078950652d
-                        Position: {X: -3.5647194, Y: 0.0, Z: -0.0037071705}
+                        Position: {X: -13.39603, Y: 0.0, Z: -9.823931}
                         Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 2.0, Y: 2.0, Z: 2.0}
                         Children: {}

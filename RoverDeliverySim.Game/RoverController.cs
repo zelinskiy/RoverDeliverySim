@@ -14,6 +14,10 @@ namespace RoverDeliverySim
         public float TurnSpeed { get; set; } = 4.0f;
         public Entity NavNetwork { get; set; }
         private List<Entity> NavNetworkPoints { get; set; }
+        public Entity MissionWaypointTemplate { get; set; }
+        public RoverMission Mission;
+        
+        
 
         private RigidbodyComponent rigidBody;
         // TODO: mk method to hide from editor
@@ -26,24 +30,29 @@ namespace RoverDeliverySim
             {
                 rigidBody.AngularFactor = new Vector3(0, 1, 0);
             }
-            NavNetworkPoints = NavNetwork.GetChildren().ToList();
-            if(NavNetworkPoints.Count < 2)
-            {
-                throw new ArgumentException("Navigation Network shall have at least 2 points");
-            }
+            //NavNetworkPoints = NavNetwork.GetChildren().ToList();
+            //if (NavNetworkPoints.Count < 2)
+            //{
+            //    throw new ArgumentException("Navigation Network shall have at least 2 points");
+            //}
         }
 
         public override void Update()
         {
-            if (TargetPosition != Vector3.Zero)
+            if (Mission is not null)
             {
-                RideTo(TargetPosition);
+                HandleMission();
             }
-            else
-            {
-                HandleInput();
-                Navigate();
-            }
+            
+            //if (TargetPosition != Vector3.Zero)
+            //{
+            //    RideTo(TargetPosition);
+            //}
+            //else
+            //{
+            //    HandleInput();
+            //    Navigate();
+            //}
         }
 
         private int navPathDirection = 1;
@@ -72,6 +81,26 @@ namespace RoverDeliverySim
             else
             {
                 TargetPosition = GetNextNavPoint().Transform.Position;
+            }
+        }
+        private void HandleMission()
+        {
+            // TODO: Tidy & refactor this whole condition
+            if (Mission is null || Mission.Status is MissionStatus.Finished or MissionStatus.Failed or MissionStatus.Paused or MissionStatus.Cancelled)
+            {
+                return;
+            }
+            else if (TargetPosition != Vector3.Zero)
+            {
+                RideTo((Vector3)Mission.Target);
+            }
+            else if(Mission.Running && Vector3.Distance(Entity.Transform.Position, (Vector3)Mission.Waypoints.Last()) < 0.3f)
+            {
+                Mission.Status = MissionStatus.Finished;
+            }
+            else
+            {
+                TargetPosition = (Vector3)Mission.SetNextWaypoint();
             }
         }
 

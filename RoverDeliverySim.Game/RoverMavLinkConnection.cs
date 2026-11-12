@@ -20,10 +20,13 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 using static System.Net.Mime.MediaTypeNames;
 using MavCmd = Asv.Mavlink.Common.MavCmd;
 
 namespace RoverDeliverySim;
+
+
 
 public class RoverMavLinkConnection : AsyncScript
 {
@@ -36,6 +39,12 @@ public class RoverMavLinkConnection : AsyncScript
     public int LocalPort = 14560;
     public string LocalHost = "127.0.0.1";
     private IServerDevice _serverDevice;
+    // Should be available like shown below, but unfortunately it doesn't :(
+    //var hbConfig = _serverDevice.Configuration.Get<MavlinkHeartbeatServerConfig>(
+    //    nameof(MavlinkHeartbeatServerConfig), 
+    //    new (() => throw new InvalidOperationException("Missing heartbeat config"))
+    //);
+    private MavlinkHeartbeatServerConfig _heartbeatConfig;
     private CancellationTokenSource _cts;
     private static readonly MavlinkIdentity MavlinkId = new(1, 1);
     // To disable single sensor:
@@ -62,7 +71,7 @@ public class RoverMavLinkConnection : AsyncScript
         "ATTITUDE",
         "HEARTBEAT",
         "GLOBAL_POSITION_INT",
-        "LOCAL_POSITION_INT",
+        "LOCAL_POSITION_NED",
         "SYS_STATUS",
         "REQUEST_DATA_STREAM",
         "FILE_TRANSFER_PROTOCOL",
@@ -179,22 +188,23 @@ public class RoverMavLinkConnection : AsyncScript
     //, ArduRoverMode.Initializing, do we need it??
     ];
 
-    // Are there standard data structures for this?
-    // TODO: Convert to List<T> where T: MavlinkV2Message? and set handlers later in the code
-    // TODO: ConcurrentDict here?
-    private readonly Dictionary<int, (double, Func<RoverMavLinkConnection, Task>)> messageIntervals = new()
+    // TODO: Encapsulate these two collections into one entity somehow
+    // These are handled inside Stride Execute() loop
+    private readonly TimerCollection<int, RoverMavLinkConnection> messageTimers =
+        new(TimeSpan.FromSeconds(1))
     {
-        [HomePositionPacket.MessageId]      = (1.0, (c) => Task.CompletedTask),
-        [ExtendedSysStatePacket.MessageId]  = (1.0, (c) => Task.CompletedTask),
-        //TODO: set delay for HeartbeatService
-        //[HeartbeatPacket.MessageId]         = (1.0, (c) => Task.CompletedTask), 
-        [LocalPositionNedPacket.MessageId]  = (1.0, (c) => c.SendLocalPosition()),
-        [GlobalPositionIntPacket.MessageId] = (1.0, (c) => c.SendGlobalPosition()),
-        [AttitudePacket.MessageId]          = (1.0, (c) => c.SendAttitude()),
-        [SysStatusPacket.MessageId]         = (1.0, (c) => c.SendSysStatus()),
+        { ExtendedSysStatePacket.MessageId },
+        { LocalPositionNedPacket.MessageId, c => c.SendLocalPosition() },
+        { GlobalPositionIntPacket.MessageId, c => c.SendGlobalPosition() },
+        { AttitudePacket.MessageId, c => c.SendAttitude() },
+        { SysStatusPacket.MessageId, c => c.SendSysStatus() },
     };
-
-    private readonly Dictionary<int, float> messageTimers = [];
+    // Update called once and basically handled by services
+    private readonly Dictionary<int, Func<RoverMavLinkConnection,TimeSpan, Task>> setMsgIntervalHandlers = new()
+    {
+        [HomePositionPacket.MessageId] = (c, i) => Task.CompletedTask,
+        [HeartbeatPacket.MessageId] = (c, i) => c.UpdateHeartbeatInterval(i),
+    };
 
     private class RoverModeHandler : IWorkModeHandler
     {
@@ -237,6 +247,7 @@ public class RoverMavLinkConnection : AsyncScript
         }
     }
 
+
     public override async Task Execute()
     {
         var tcs = new TaskCompletionSource();
@@ -266,7 +277,9 @@ public class RoverMavLinkConnection : AsyncScript
             core,
             builder =>
             {
-                builder.RegisterHeartbeat();
+                _heartbeatConfig = new MavlinkHeartbeatServerConfig();
+                UpdateHeartbeatInterval(TimeSpan.FromSeconds(1));
+                builder.RegisterHeartbeat(_heartbeatConfig);
                 builder.RegisterParams();
                 builder.RegisterCommand();
                 builder.RegisterCommandIntEx();
@@ -314,29 +327,23 @@ public class RoverMavLinkConnection : AsyncScript
         // HEARTBEAT, SYS_STATUS: 1 Hz
         // GLOBAL_POSITION_INT, LOCAL_POSITION_NED: 2-5 Hz
         // ATTITUDE: 10-20 Hz
-        foreach (var k in messageIntervals.Keys)
-        {
-            messageTimers[k] = 0f;
-        }
 
         while (Game.IsRunning && !_cts.IsCancellationRequested)
         {
-            foreach (var k in messageIntervals.Keys)
-            {
-                messageTimers[k] += (float)Game.UpdateTime.Elapsed.TotalSeconds;
-                var (interval, handler) = messageIntervals[k];
-                if(messageTimers[k] >= interval)
-                {
-                    await handler(arg: this);
-                }
-            }
+            await messageTimers.TickAsync(Game.UpdateTime.Total, this);
             await Script.NextFrame();
         }
 
-        _cts.Cancel();
+        await _cts.CancelAsync();
         //_router.Dispose(); TBD ???
         // TODO: properly dispose all subscriptions and resources, including Setup*() method calls
         // TODO: Check _cts is propagated everywhere
+    }
+
+    private Task UpdateHeartbeatInterval(TimeSpan interval)
+    {
+        _heartbeatConfig.HeartbeatRateMs = (int)interval.TotalMilliseconds;
+        return Task.CompletedTask;
     }
 
     private async Task SetupDiagnostic()
@@ -498,6 +505,7 @@ public class RoverMavLinkConnection : AsyncScript
     private async Task SetupHeartbeatService()
     {
         var heartbeatService = _serverDevice.GetHeartbeat();
+        if (!heartbeatService.IsInit) await heartbeatService.Init(_cts.Token);
         heartbeatService.Set(hb =>
         {
             var modeService = _serverDevice.GetMode();
@@ -521,7 +529,7 @@ public class RoverMavLinkConnection : AsyncScript
             hb.SystemStatus = MavState.MavStateActive;
             hb.MavlinkVersion = 3;
         });
-        if (!heartbeatService.IsInit) await heartbeatService.Init(_cts.Token);
+        _serverDevice.GetCommand();       
         heartbeatService.Start();
     }
 
@@ -635,15 +643,23 @@ public class RoverMavLinkConnection : AsyncScript
         commandLongService[MavCmd.MavCmdSetMessageInterval] = async (id, packet, ct) =>
         {
             var messageId = (int)packet.Payload.Param1;
-            if (!messageIntervals.ContainsKey(messageId))
+            var intervalMs = (long)packet.Payload.Param2;
+            if (messageTimers.Contains(messageId))
+            {
+                messageTimers.PostIntervalMicroseconds(messageId, intervalMs);
+                return CommandResult.Accepted;
+            } 
+            else if (setMsgIntervalHandlers.TryGetValue(messageId, out var handler))
+            {
+                await handler(this, TimeSpan.FromMilliseconds(intervalMs));
+                return CommandResult.Accepted;
+            }
+            else
             {
                 Log.Warning($"Requested to set interval for unsupported message {messageId}");
                 return CommandResult.Unsupported;
             }
-            var handler = messageIntervals[messageId].Item2;
-            var interval = (double)packet.Payload.Param2;
-            messageIntervals[messageId] = (interval, handler);
-            return CommandResult.Accepted;
+            
         };
         commandLongService.Start();
     }

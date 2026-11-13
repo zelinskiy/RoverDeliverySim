@@ -17,12 +17,15 @@ using Stride.Physics;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using static System.Net.Mime.MediaTypeNames;
 using MavCmd = Asv.Mavlink.Common.MavCmd;
+//using ArduPilotCmd = Asv.Mavlink.Ardupilotmega.MavCmd;
 
 namespace RoverDeliverySim;
 
@@ -37,8 +40,13 @@ public abstract record ControllerMsg
 // Connection -> Controller
 public abstract record ConnectionMsg
 {
-    public sealed record MissionReceived(IReadOnlyList<MissionItem> Items) : ConnectionMsg;
+    public sealed record LoadMission(RoverMission Mission) : ConnectionMsg;
     public sealed record StartMission : ConnectionMsg;
+    public sealed record ClearMission : ConnectionMsg;
+    public sealed record CancelMission : ConnectionMsg;
+    public sealed record PauseMission : ConnectionMsg;
+    public sealed record FinishMission : ConnectionMsg;
+    public sealed record SmartRtl : ConnectionMsg;
     public sealed record ChangeWaypoint(ushort Seq) : ConnectionMsg;
 }
 public sealed class MissionBus
@@ -319,6 +327,9 @@ public class RoverMavLinkConnection : AsyncScript
                 builder.RegisterCommandLongEx();
                 builder.RegisterMission();
                 builder.RegisterMissionEx();
+                //builder.RegisterMissionClient();
+                //builder.Register<MissionClient>(x => { });
+                //builder.Register<MissionClientEx>(x => { });
                 builder.RegisterStatus();
 
                 // Can't use the standard mode microservice since it got mode mapping implemented
@@ -472,7 +483,7 @@ public class RoverMavLinkConnection : AsyncScript
                 {
                     return;
                 }
-                else if (msg.Name == "STATUSTEXT" && msg is StatustextPacket statusMsg)
+                else if (msg is StatustextPacket statusMsg)
                 {
                     Log.Info($"Sent status msg [{statusMsg.Payload.Severity}]: {string.Concat(statusMsg.Payload.Text)}");
                 }
@@ -737,26 +748,32 @@ public class RoverMavLinkConnection : AsyncScript
         // --- CHANGE ACTIVE ITEM ---
         // COMMAND_LONG (MAV_CMD_DO_SET_MISSION_CURRENT) -> COMMAND_ACK + MISSION_CURRENT (Broadcast)
 
-        //missionServiceEx[MavCmd.MavCmdDoSetMissionCurrent] = async (item, ct) =>
-        //{
-        //    Log.Info($"Mission SET_CURRENT {item.Seq}");
-        //    await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted);
-        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
-        //    await missionService.SendMissionCurrent(item.Seq);
-        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
-        //};
         missionServiceEx[MavCmd.MavCmdNavWaypoint] = async (item, ct) =>
         {
-            Log.Info($"Mission NAV_WAYPOINT_{item.Seq} ({item.X}, {item.Y})");
-            var result = MissionBusAdapter.FromController
+            Log.Info($"Moving to waypoint {item.Seq} ({item.X}, {item.Y})");
+            var controllerListener = MissionBusAdapter.FromController
                 .Where(m =>
                     m is ControllerMsg.Fail
                     || m is ControllerMsg.WaypointReached r
                     && r.Seq == item.Seq
                 ).FirstAsync(ct);
             MissionBusAdapter.Send(new ConnectionMsg.ChangeWaypoint(item.Seq));
-            if (await result is ControllerMsg.Fail f)
-                throw new InvalidOperationException(f.Reason);
+            try
+            {
+                var controllerMsg = await controllerListener;
+                if (controllerMsg is ControllerMsg.Fail f)
+                {
+                    Log.Error($"Waypoint execution failed: {f.Reason}");
+                    //throw new InvalidOperationException(f.Reason);
+                }
+                    
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                Log.Warning($"Waypoint {item.Seq} cancelled.");
+                MissionBusAdapter.Send(new ConnectionMsg.CancelMission());
+                //throw;
+            }            
         };
         missionServiceEx[MavCmd.MavCmdMissionStart] = async (item, ct) =>
         {
@@ -771,8 +788,88 @@ public class RoverMavLinkConnection : AsyncScript
         //    Log.Info($"Mission RTL");
         //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
         //};
-        //missionServiceEx.Reached.
+        //missionServiceEx[MavCmd.MavCmdDoSetMode] = async (item, ct) =>
+        //{
 
+        //    Log.Info($"SMART_RTL mode enabled");
+        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        //};
+        missionServiceEx.State.Subscribe(m => 
+        {
+            Log.Info($"Mission state changed: {m}");
+            ConnectionMsg command = m switch
+            {
+                MissionServerState.Idle => new ConnectionMsg.PauseMission(),
+                MissionServerState.Canceled => new ConnectionMsg.CancelMission(),
+                MissionServerState.Running => new ConnectionMsg.StartMission(),
+                MissionServerState.CompleteSuccess => new ConnectionMsg.FinishMission(),
+                _ => throw new NotImplementedException(),
+            };
+            MissionBusAdapter.Send(command);
+        });
+        missionServiceEx.Current.Subscribe(m =>
+        {
+            Log.Info($"Current mission item changed: {m}");
+            MissionBusAdapter.Send(new ConnectionMsg.ChangeWaypoint(m));
+        });
+        missionServiceEx.Items.CollectionChanged += (in e) =>
+        {
+            switch (e.Action, e.IsSingleItem)
+            {
+                case (NotifyCollectionChangedAction.Add, true):
+                    {
+                        Log.Info($"Mission item added: {e.NewItem.Seq}");
+                        break;
+                    }
+                case (NotifyCollectionChangedAction.Add, false):
+                    {
+                        var new_items = e.NewItems.ToArray().Select(i => i.Seq);
+                        Log.Info($"Mission items added: {string.Join(",", new_items)}");
+                        break;
+                    }                    
+                case (NotifyCollectionChangedAction.Remove, true):
+                    {
+                        Log.Info($"Mission item removed: {e.OldItem.Seq}");
+                        break;
+                    }
+                case (NotifyCollectionChangedAction.Remove, false):
+                    {
+                        var old_items = e.OldItems.ToArray().Select(i => i.Seq);
+                        Log.Info($"Mission items removed: {string.Join(",", old_items)}");
+                        break;
+                    }
+                case (NotifyCollectionChangedAction.Replace or NotifyCollectionChangedAction.Reset, _):
+                    {
+                        var new_items = e.NewItems.ToArray().Select(i => i.Seq);
+                        var old_items = e.OldItems.ToArray().Select(i => i.Seq);
+                        Log.Info($"Mission item changed: {string.Join(",", old_items)} => {string.Join(",", old_items)}");
+                        break;
+                    }
+                default:
+                    throw new NotImplementedException();
+            }
+        };
+        missionServiceEx.Reached.Subscribe(m =>
+        {
+            Log.Info($"Mission waypoint reached: {m}");
+        });
+        // missionService.OnMissionAck on RX channel only
+        missionService.Core.Connection.OnTxMessage
+            .FilterByType<MissionAckPacket>()
+            .Where(p => p.FullId == MavlinkId)
+            .Subscribe(msg =>
+        {
+            var waypoints = missionServiceEx.Items.Select(i => new Vector2(i.X, i.Y)).ToList();
+            var mission = new RoverMission(waypoints);
+            MissionBusAdapter.Send(new ConnectionMsg.LoadMission(mission));
+        });
+        missionService.OnMissionClearAll.Subscribe(msg =>
+        {
+            MissionBusAdapter.Send(new ConnectionMsg.ClearMission());
+        });
+        //missionService.OnMissionSetCurrent -- lifted to missionServiceEx.Current
+
+        Log.Info($"Mission service started, available commands: {string.Join(", ", missionServiceEx.SupportedCommands)}");
         await missionServiceEx.Init(_cts.Token);
         missionServiceEx.Start();
     }
@@ -872,6 +969,11 @@ public class RoverMavLinkConnection : AsyncScript
         modeService.CurrentMode.Subscribe(modeHandler =>
         {
             Log.Info($"Current mode changed: {modeHandler.Mode.Name}");
+            // It's probably better to check this by type, not by name
+            if(modeHandler.Mode.Name == ArduRoverMode.SmartRtl.Name)
+            {
+                MissionBusAdapter.Send(new ConnectionMsg.SmartRtl());
+            }
         });
 
         modeService.Start();

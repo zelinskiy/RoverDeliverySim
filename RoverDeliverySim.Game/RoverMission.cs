@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-
+using Stride.Core.Extensions;
 using Stride.Core.Mathematics;
 
 namespace RoverDeliverySim
@@ -20,25 +20,18 @@ namespace RoverDeliverySim
     public class RoverMission
     {
         public List<Vector2> Waypoints { get; }
-        private int _targetIndex;
+        public ushort Seq { get; private set; }
         public Vector2 Target
         {
             get
             {
-                return Waypoints.ElementAt(_targetIndex);
+                return Waypoints.ElementAt(Seq);
             }
         }
 
         public MissionStatus Status { 
-            get; 
-            set
-            {
-                if (value == MissionStatus.Ready)
-                {
-                    //throw new ArgumentException()
-                }
-                field = value;
-            }
+            get;
+            private set;
         }
 
         public bool Finished => Status == MissionStatus.Finished;
@@ -47,12 +40,12 @@ namespace RoverDeliverySim
 
         public RoverMission(IEnumerable<Vector2> waypoints)
         {
-            if(waypoints.Any())
+            if(waypoints.IsNullOrEmpty())
             {
                 throw new ArgumentException("Mission must have at least one waypoint");
             }
             Waypoints = [..waypoints];
-            _targetIndex = 0;
+            Seq = 0;
             Status = MissionStatus.Ready;
         }
 
@@ -60,30 +53,38 @@ namespace RoverDeliverySim
         {
             if(index < 0 || index >= Waypoints.Count)
             {
-                throw new IndexOutOfRangeException($"Waypoint {index} is out of range");
+                throw new ArgumentException($"Waypoint {index} is out of range");
             }
-            _targetIndex = index;
+            Seq = (ushort)index;
         }
 
         public void Reset()
         {
             Status = MissionStatus.Ready;
-            _targetIndex = 0;
-        }
-
-        public void Start()
-        {
-            Status = MissionStatus.Running;
-        }
+            Seq = 0;
+        }        
+        public void Start() => Status = MissionStatus.Running;
         
-        public Vector2 SetNextWaypoint() 
+        public void Pause() => Status = MissionStatus.Paused;
+        public void Cancel() => Status = MissionStatus.Paused;
+        public void Abort() => Status = MissionStatus.Failed;
+        public void Finish() => Status = MissionStatus.Finished;
+
+        public Vector2 TargetNextWaypoint() 
         {
-            if (_targetIndex == Waypoints.Count)
+            if (Seq == Waypoints.Count)
             {
                 throw new InvalidOperationException("Already heading to the last waypoint");
             }
-            _targetIndex++;
+            Seq++;
             return Target;
         }
+
+        public RoverMission GetSmartRtlMission()
+        {
+            return new RoverMission(Waypoints.Take(Seq + 1).Reverse().ToList());
+        }
+
+        
     }
 }

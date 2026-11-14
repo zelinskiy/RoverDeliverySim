@@ -67,7 +67,6 @@ Hierarchy:
                         TurnSpeed: 3.0
                         NavNetwork: ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
                         MissionWaypointTemplate: null
-                        TargetPosition: {X: 0.0, Y: 0.0, Z: 0.0}
                     feccb45ae0047ebd110ef237a98adc3a: !RigidbodyComponent
                         Id: a0e1f282-d754-462a-91c3-8583050d2c3d
                         CanSleep: false

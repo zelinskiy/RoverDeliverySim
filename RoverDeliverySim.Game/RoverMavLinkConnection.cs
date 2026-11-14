@@ -217,7 +217,7 @@ public class RoverMavLinkConnection : AsyncScript
         ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32),
     ];
 
-    private new readonly Logger Log = GlobalLogger.GetLogger("MAVLink");
+    private new readonly TaggedLogger Log = new TaggedLogger("RoverMAVLink");
     private static readonly List<ArduRoverMode> SupportedModes =
     [ ArduRoverMode.Manual
     //, ArduRoverMode.Steering, do we need it?
@@ -252,9 +252,9 @@ public class RoverMavLinkConnection : AsyncScript
     {
         private readonly ArduRoverMode _mode;
 
-        public RoverModeHandler(Logger log, ICustomMode mode)
+        public RoverModeHandler(Action<string> logCall, ICustomMode mode)
         {
-            Log = log;
+            LogCall = logCall;
             if (mode is ArduRoverMode roverMode)
             {
                 _mode = roverMode;
@@ -266,10 +266,10 @@ public class RoverMavLinkConnection : AsyncScript
         }
         public ArduRoverMode Mode => _mode;
         ICustomMode IWorkModeHandler.Mode => _mode;
-        public Logger Log { get; }
+        public Action<string> LogCall;
         public Task Init(CancellationToken cancel)
         {
-            Log.Info($"Handler for {_mode.Name} mode created");
+            LogCall($"Handler for {_mode.Name} mode created");
             //if (mode == ArduCopterMode.Guided)
             //{
             //    Log.Info($"Handler for Guided mode created");
@@ -279,7 +279,7 @@ public class RoverMavLinkConnection : AsyncScript
 
         public Task Destroy(CancellationToken cancel)
         {
-            Log.Info($"Handler for {_mode.Name} mode destroyed");
+            LogCall($"Handler for {_mode.Name} mode destroyed");
             //if (mode == ArduCopterMode.Guided)
             return Task.CompletedTask;
         }
@@ -339,7 +339,7 @@ public class RoverMavLinkConnection : AsyncScript
                 builder.RegisterMode(
                     ArduRoverMode.Hold,
                     SupportedModes,
-                    mode => new RoverModeHandler(Log, mode)
+                    mode => new RoverModeHandler(Log.Info, mode)
                 );
 
                 //builder.RegisterFtpEx(); // File transfer

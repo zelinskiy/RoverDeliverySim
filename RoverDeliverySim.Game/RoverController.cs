@@ -1,6 +1,7 @@
 ﻿using Asv.Mavlink;
 using DotNext.Collections.Generic;
 using R3;
+using Stride.Core;
 using Stride.Core.Diagnostics;
 using Stride.Core.Mathematics;
 using Stride.Engine;
@@ -21,14 +22,18 @@ namespace RoverDeliverySim
         public Entity NavNetwork { get; set; }
         private List<Entity> NavNetworkPoints { get; set; }
         public Entity MissionWaypointTemplate { get; set; }
+        [DataMemberIgnore]
         public RoverMission? Mission;
         private RoverMission? SmartRtlMission;
         // Link to RigidbodyComponent.MissionBusAdapter
+        [DataMemberIgnore]
         public MissionBus MissionBusAdapter;
-        private new readonly Logger Log = GlobalLogger.GetLogger("Rover");
+        public readonly float WaypointReachedTolerance = 0.25f;
+        private new readonly TaggedLogger Log = new TaggedLogger("RoverController");
         private RigidbodyComponent _rigidBody;
         // TODO: mk method to hide from editor
-        public Vector3? TargetPosition { get; set; }
+        [DataMemberIgnore]
+        public Vector2? TargetPosition { get; set; } = null;
 
         public override void Start()
         {
@@ -37,13 +42,26 @@ namespace RoverDeliverySim
             {
                 _rigidBody.AngularFactor = new Vector3(0, 1, 0);
             }
-            //NavNetworkPoints = NavNetwork.GetChildren().ToList();
-            //if (NavNetworkPoints.Count < 2)
-            //{
-            //    throw new ArgumentException("Navigation Network shall have at least 2 points");
-            //}
-            MissionBusAdapter = Entity.Get<RoverMavLinkConnection>().MissionBusAdapter;
+            NavNetworkPoints = NavNetwork.GetChildren().ToList();
+            if (NavNetworkPoints.Count < 2)
+            {
+                throw new ArgumentException("Navigation Network shall have at least 2 points");
+            }
+            //MissionBusAdapter = Entity.Get<RoverMavLinkConnection>().MissionBusAdapter;
+            //MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);            
+            RunTestMission();
+        }
+
+        private void RunTestMission()
+        {            
+            var waypoints = NavNetworkPoints.Select(p => new Vector2(p.Transform.Position.X, p.Transform.Position.Z));
+            waypoints = Enumerable.Repeat(waypoints, 3).SelectMany(wp => wp);
+            var mission = new RoverMission(waypoints);
+            // To remove interference with MissionServer in RoverMavlinkConnection
+            MissionBusAdapter = new MissionBus();
             MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);
+            MissionBusAdapter.Send(new ConnectionMsg.LoadMission(mission));
+            MissionBusAdapter.Send(new ConnectionMsg.StartMission());
         }
 
         private void ConnectionMessageHandler(ConnectionMsg msg)
@@ -56,32 +74,39 @@ namespace RoverDeliverySim
             switch (msg)
             {
                 case ConnectionMsg.LoadMission payload:
+                    Log.Info("Load mission");
                     Mission = payload.Mission;
                     Mission.Reset();
                     return;
                 case ConnectionMsg.StartMission:
-                    Log.Info("Start mission");
+                    Log.Info("Start mission");                    
                     Mission.Start();
+                    TargetPosition = Mission.Target;
                     return;
                 case ConnectionMsg.PauseMission:
                     Log.Info("Mission paused");
-                    Mission?.Pause();
+                    Mission.Pause();
+                    TargetPosition = null;
                     return;
                 case ConnectionMsg.FinishMission:
                     Log.Info("Mission finished");
                     Mission.Finish();
+                    TargetPosition = null;
                     return;
                 case ConnectionMsg.CancelMission:
                     Log.Info("Mission cancelled");
                     Mission.Cancel();
+                    TargetPosition = null;
                     return;
                 case ConnectionMsg.ClearMission:
                     Log.Info($"Mission cleared");
                     Mission = null;
+                    TargetPosition = null;
                     return;
                 case ConnectionMsg.ChangeWaypoint payload:
                     Log.Info($"Moving to waypoint {payload.Seq}");
                     Mission.SetTarget(payload.Seq);
+                    TargetPosition = Mission.Target;
                     return;
                 case ConnectionMsg.SmartRtl:
                     Log.Info($"Executing Smart RTL mission");
@@ -100,16 +125,14 @@ namespace RoverDeliverySim
             {
                 HandleMission();
             }
-            
-            //if (TargetPosition != Vector3.Zero)
-            //{
-            //    RideTo(TargetPosition);
-            //}
-            //else
-            //{
-            //    HandleInput();
-            //    Navigate();
-            //}
+            else if (TargetPosition is Vector2 target)
+            {
+                RideTo(target);
+            }
+            else
+            {
+                HandleInput();
+            }
         }
 
         private void HandleMission()
@@ -118,25 +141,29 @@ namespace RoverDeliverySim
             {
                 return;
             }
-            else if (TargetPosition is not null)
-            {
-                RideTo((Vector3)Mission.Target);
-                return;
-            }            
-            else if(Vector3.Distance(Entity.Transform.Position, (Vector3)Mission.Waypoints.Last()) < 0.3f)
+
+            var position = Entity.Transform.Position.XZ();
+            bool reachedLast = Vector2.Distance(position, Mission.Waypoints.Last()) 
+                    < WaypointReachedTolerance && Mission.Seq == Mission.Waypoints.Count - 1;  
+            if (reachedLast)
             {
                 var response = new ControllerMsg.WaypointReached(Mission.Seq);
                 MissionBusAdapter.Send(response);
                 Mission.Finish();
+                TargetPosition = null;
                 return;
             }
-            else
+
+            if (TargetPosition is Vector2 target)
             {
-                var response = new ControllerMsg.WaypointReached(Mission.Seq);
-                MissionBusAdapter.Send(response);
-                TargetPosition = (Vector3)Mission.TargetNextWaypoint();
+                if(Vector2.Distance(position, target) < WaypointReachedTolerance)
+                {
+                    TargetPosition = Mission.TargetNextWaypoint();
+                }
+                RideTo(target);
                 return;
             }
+            
         }
 
         private void HandleSmartRtlMission()
@@ -145,15 +172,15 @@ namespace RoverDeliverySim
             {
                 return;
             }
-            else if (TargetPosition != Vector3.Zero)
+            if (TargetPosition is not null)
             {
-                RideTo((Vector3)SmartRtlMission.Target);
+                RideTo(SmartRtlMission.Target);
             }
-            else if (TargetPosition == Vector3.Zero)
+            else
             {
-                TargetPosition = (Vector3)SmartRtlMission.TargetNextWaypoint();
+                TargetPosition = SmartRtlMission.TargetNextWaypoint();
             }
-            else if (Vector3.Distance(Entity.Transform.Position, (Vector3)SmartRtlMission.Waypoints.Last()) < 0.3f)
+            if (Vector2.Distance(Entity.Transform.Position.XZ(), SmartRtlMission.Waypoints.Last()) < WaypointReachedTolerance)
             {
                 // TODO: Notify we're home
                 SmartRtlMission = null;
@@ -185,45 +212,49 @@ namespace RoverDeliverySim
             }
         }
 
-        private void RideTo(Vector3 targetPosition)
+        private void RideTo(Vector2 targetPosition)
         {
-            float distanceTolerance = 0.3f;
-            float angleTolerance = 0.98f;
-            Vector3 currentPosition = Entity.Transform.Position;
+            const float angleTolerance = 0.98f;
+
+            Vector3 pos = Entity.Transform.Position;
+
+            Vector3 toTarget = new(targetPosition.X - pos.X, 0f, targetPosition.Y - pos.Z);
+            float distance = toTarget.Length();
 
             // Arrived at point
-            if (Vector3.Distance(currentPosition, targetPosition) < distanceTolerance)
+            if (distance < WaypointReachedTolerance)
             {
-                TargetPosition = Vector3.Zero;
                 _rigidBody.LinearVelocity = new Vector3(0, _rigidBody.LinearVelocity.Y, 0);
                 _rigidBody.AngularVelocity = Vector3.Zero;
                 return;
             }
+            toTarget /= distance;
 
             Vector3 currentDirection = Entity.Transform.WorldMatrix.Forward;
             currentDirection.Y = 0f;
-            currentDirection.Normalize();            
-            Vector3 toTarget = targetPosition - currentPosition;
-            toTarget.Y = 0f;
-            toTarget.Normalize();
+            if (currentDirection.LengthSquared() < 1e-6f) return;
+            currentDirection.Normalize();
 
             float dot = Vector3.Dot(currentDirection, toTarget);
 
             if (dot > angleTolerance)
             {
-                _rigidBody.AngularVelocity = new Vector3(0, 0, 0);
+                // Facing the target: drive forward
+                _rigidBody.AngularVelocity = Vector3.Zero;
                 Vector3 driveVel = currentDirection * MoveSpeed;
                 driveVel.Y = _rigidBody.LinearVelocity.Y;
                 _rigidBody.LinearVelocity = driveVel;
             }
             else
             {
+                // Turn in place
                 Vector3 cross = Vector3.Cross(currentDirection, toTarget);
                 _rigidBody.LinearVelocity = new Vector3(0, _rigidBody.LinearVelocity.Y, 0);
                 Vector3 angularVel = _rigidBody.AngularVelocity;
-                angularVel.Y = Math.Sign(cross.Y) * TurnSpeed;
+                // Target exactly behind: cross.Y == 0, so pick a side
+                angularVel.Y = (cross.Y >= 0 ? 1f : -1f) * TurnSpeed;
                 _rigidBody.AngularVelocity = angularVel;
-            }           
+            }
         }
     }
 }

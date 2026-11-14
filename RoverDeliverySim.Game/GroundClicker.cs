@@ -39,7 +39,7 @@ namespace RoverDeliverySim
                         var roverController = Rover.Get<RoverController>();
                         if (roverController != null)
                         {
-                            roverController.TargetPosition = hitPoint;
+                            roverController.TargetPosition = hitPoint.XZ();
                         }
                     }
                 }

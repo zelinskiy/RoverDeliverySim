@@ -859,8 +859,14 @@ public class RoverMavLinkConnection : AsyncScript
             .Where(p => p.FullId == MavlinkId)
             .Subscribe(msg =>
         {
-            var waypoints = missionServiceEx.Items.Select(i => new Vector2(i.X, i.Y)).ToList();
-            var mission = new RoverMission(waypoints);
+            var originalWaypoints = missionServiceEx.Items.Select(i => (i.X, i.Y));
+            Log.Info($"Mavlink mission endpoints: {string.Join(", ", originalWaypoints)}");
+            var strideWaypoints = originalWaypoints.Select(i => {
+                var mp = PositionUtils.MavlinkToStride(i.X, i.Y);
+                return new Vector2(mp.X, mp.Z);
+            }).ToList();
+            Log.Info($"Stride mission endpoints: {string.Join(", ", strideWaypoints)}");
+            var mission = new RoverMission(strideWaypoints);
             MissionBusAdapter.Send(new ConnectionMsg.LoadMission(mission));
         });
         missionService.OnMissionClearAll.Subscribe(msg =>
@@ -1001,11 +1007,8 @@ public class RoverMavLinkConnection : AsyncScript
     {
         var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
-            var pos = t.Position;
-            payload.Lat = (int)(SaveMapImageScript.SceneOriginLat * Math.Pow(10, 7) - pos.Z * 100);
-            payload.Lon = (int)(SaveMapImageScript.SceneOriginLon * Math.Pow(10, 7) + pos.X * 100);
-            payload.Alt = (int)(SaveMapImageScript.SceneOriginAlt * 1000 - pos.Y * 1000);
-            payload.RelativeAlt = payload.Alt;
+            (payload.Lat, payload.Lon, payload.Alt, payload.RelativeAlt) = 
+                PositionUtils.StrideToMavlink(t.Position);
 
             var v = rb.LinearVelocity;
             payload.Vx = (short)(-v.Z * 100);

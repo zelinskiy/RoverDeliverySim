@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace RoverDeliverySim
 {
     public class RoverController : SyncScript
-    {
+    {        
         public float MoveSpeed { get; set; } = 10.0f;
         public float TurnSpeed { get; set; } = 4.0f;
         // TODO: Navigate along predefined safe routes

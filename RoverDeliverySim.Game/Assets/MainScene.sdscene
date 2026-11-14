@@ -62,6 +62,7 @@ Hierarchy:
                     685a1aee78d9c0b35d681fff16e4dee4: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
                         Mission: null
+                        MissionBusAdapter: null
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
                         NavNetwork: ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
@@ -271,11 +272,11 @@ Hierarchy:
                         UseCustomAspectRatio: true
                         AspectRatio: 1.0
                         Slot: aa64ca60-45ba-479a-9a64-0944ddf82284
-                    42e64befcec6dbc6d1ad9c3035b6b6ab: !.SaveMapImageScript,RoverDeliverySim.Game
-                        Id: 9fc9da21-b59e-41c6-8bbb-6fb0ead7b6c9
-                        RenderTargetAsset: a02651e2-abce-4042-8600-8b53d40f4d1c:Models/Textures/RenderTexture
                     5e1c42945a918a69529ec335cad7c146: !RoverDeliverySim.TileServer,RoverDeliverySim.Game
                         Id: 7537d606-1912-4ec1-9cd6-ffb0b0b1aad0
+                    bb0de309fc856569005ee3e26600f3cd: !RoverDeliverySim.SaveMapImageScript,RoverDeliverySim.Game
+                        Id: b273f6ae-5766-4134-89be-5769442b586c
+                        RenderTargetAsset: a02651e2-abce-4042-8600-8b53d40f4d1c:Models/Textures/RenderTexture
         -   Entity:
                 Id: e8e1e927-81fb-4953-ae31-19f6c272fd1a
                 Name: Pharmacy

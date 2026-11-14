@@ -8,6 +8,8 @@ using System.IO;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 
+namespace RoverDeliverySim;
+
 public class SaveMapImageScript : AsyncScript
 {
     private class CaptureRequest
@@ -16,9 +18,7 @@ public class SaveMapImageScript : AsyncScript
         public TaskCompletionSource<byte[]> Result =
             new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
-    public static readonly double SceneOriginLat = 51.1079;
-    public static readonly double SceneOriginLon = 17.0385;
-    public static readonly double SceneOriginAlt = 118.0;
+    
     private readonly ConcurrentQueue<CaptureRequest> _requestsQueue = new();
     public Texture RenderTargetAsset;
     private Vector3 _initPosition;
@@ -74,15 +74,7 @@ public class SaveMapImageScript : AsyncScript
         var req = new CaptureRequest { X = x, Y = y, Z = z };
         _requestsQueue.Enqueue(req);
         return req.Result.Task;
-    }
-
-    private static (double, double) LatLonToMercator(double lat, double lon)
-    {
-        const double R = 6378137.0;
-        double mx = lon * Math.PI / 180.0 * R;
-        double my = Math.Log(Math.Tan(Math.PI / 4.0 + lat * Math.PI / 360.0)) * R;
-        return (mx, my);
-    }
+    }    
 
     private void MoveToWebMercatorPos(int x, int y, int z)
     {
@@ -93,11 +85,10 @@ public class SaveMapImageScript : AsyncScript
         double tileMx = (x * 256.0 + 128.0) * resolution - originShift;
         double tileMy = originShift - (y * 256.0 + 128.0) * resolution; // northing
 
-        var (originMx, originMy) = LatLonToMercator(SceneOriginLat, SceneOriginLon);
-        double k = Math.Cos(SceneOriginLat * Math.PI / 180.0);
+        double k = Math.Cos(PositionUtils.SceneOriginGPS.Lat * Math.PI / 180.0);
 
-        double east = (tileMx - originMx) * k;   // ground meters
-        double north = (tileMy - originMy) * k;
+        double east = (tileMx - PositionUtils.SceneOriginMercator.Lat) * k;   // ground meters
+        double north = (tileMy - PositionUtils.SceneOriginMercator.Lon) * k;
 
         var camera = Entity.Get<CameraComponent>();
         Entity.Transform.Position = new Vector3((float)east, 500f, (float)(-north));

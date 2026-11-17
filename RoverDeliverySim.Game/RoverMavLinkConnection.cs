@@ -47,8 +47,8 @@ public abstract record ConnectionMsg
     public sealed record CancelMission : ConnectionMsg;
     public sealed record PauseMission : ConnectionMsg;
     public sealed record FinishMission : ConnectionMsg;
-    public sealed record SmartRtl : ConnectionMsg;
     public sealed record ChangeWaypoint(ushort Seq) : ConnectionMsg;
+    public sealed record SetMode(RoverController.RoverMode Mode) : ConnectionMsg;
 }
 public sealed class MissionBus
 {
@@ -64,6 +64,7 @@ public sealed class MissionBus
 
 
 // TODO: Move all mission-related mavlink stuff in a separate component
+// TODO: Loose coupling Controller <-> Connection
 public class RoverMavLinkConnection : AsyncScript
 {
     // TODO: 
@@ -218,7 +219,7 @@ public class RoverMavLinkConnection : AsyncScript
         ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32),
     ];
 
-    private new readonly TaggedLogger Log = new TaggedLogger("RoverMAVLink");
+    private new readonly TaggedLogger Log = new("RoverMAVLink");
     private static readonly List<ArduRoverMode> SupportedModes =
     [ ArduRoverMode.Manual
     //, ArduRoverMode.Steering, do we need it?
@@ -253,9 +254,10 @@ public class RoverMavLinkConnection : AsyncScript
     {
         private readonly ArduRoverMode _mode;
 
-        public RoverModeHandler(Action<string> logCall, ICustomMode mode)
+        public RoverModeHandler(Action<string> logCall, Action<ConnectionMsg> roverBusCall, ICustomMode mode)
         {
             LogCall = logCall;
+            RoverBusCall = roverBusCall;
             if (mode is ArduRoverMode roverMode)
             {
                 _mode = roverMode;
@@ -267,14 +269,20 @@ public class RoverMavLinkConnection : AsyncScript
         }
         public ArduRoverMode Mode => _mode;
         ICustomMode IWorkModeHandler.Mode => _mode;
-        public Action<string> LogCall;
+        private Action<string> LogCall;
+        private Action<ConnectionMsg> RoverBusCall;
         public Task Init(CancellationToken cancel)
         {
             LogCall($"Handler for {_mode.Name} mode created");
-            //if (mode == ArduCopterMode.Guided)
-            //{
-            //    Log.Info($"Handler for Guided mode created");
-            //}
+            var mode = _mode switch
+            {
+                var m when m == ArduRoverMode.SmartRtl  => RoverController.RoverMode.RTL,
+                var m when m == ArduRoverMode.Auto      => RoverController.RoverMode.Auto,
+                var m when m == ArduRoverMode.Guided    => RoverController.RoverMode.Guided,
+                var m when m == ArduRoverMode.Manual    => RoverController.RoverMode.Manual,
+                _                                       => RoverController.RoverMode.Hold
+            };
+            RoverBusCall(new ConnectionMsg.SetMode(mode));
             return Task.CompletedTask;
         }
 
@@ -340,7 +348,7 @@ public class RoverMavLinkConnection : AsyncScript
                 builder.RegisterMode(
                     ArduRoverMode.Hold,
                     SupportedModes,
-                    mode => new RoverModeHandler(Log.Info, mode)
+                    mode => new RoverModeHandler(Log.Info, MissionBusAdapter.Send, mode)
                 );
 
                 //builder.RegisterFtpEx(); // File transfer
@@ -853,15 +861,8 @@ public class RoverMavLinkConnection : AsyncScript
         missionServiceEx.Reached.Subscribe(m =>
         {
             Log.Info($"Mission waypoint reached: {m}");
-        });
-        // TODO:
-        // NAV_LOITER_UNLIM, NAV_LOITER_TIME
-        // NAV_DELAY
-        // NAV_RETURN_TO_LAUNCH
-        // DO_JUMP/177 -- jump to %seq%
-        // DO_CHANGE_SPEED, DO_SET_SERVO, DO_SET_RELAY, DO_SET_CAM_TRIGG_DIST, ...
-        // CONDITION_DELAY/112, CONDITION_DISTANCE/114, CONDITION_YAW/115
-        // missionService.OnMissionAck on RX channel only
+        });        
+        // missionService.OnMissionAck handles RX channel only
         missionService.Core.Connection.OnTxMessage
             .FilterByType<MissionAckPacket>()
             .Where(p => p.FullId == MavlinkId)
@@ -869,6 +870,7 @@ public class RoverMavLinkConnection : AsyncScript
         {
             if(missionServiceEx.Items.Count == 0)
             {
+                // Mission cleared
                 return;
             }
             var originalWaypoints = missionServiceEx.Items
@@ -901,6 +903,13 @@ public class RoverMavLinkConnection : AsyncScript
                         strideWaypoints.AddRange(rtlWaypoints);
                         break;
                     default:
+                        // TODO:
+                        // NAV_LOITER_UNLIM, NAV_LOITER_TIME
+                        // NAV_DELAY
+                        // NAV_RETURN_TO_LAUNCH
+                        // DO_JUMP/177 -- jump to %seq%
+                        // DO_CHANGE_SPEED, DO_SET_SERVO, DO_SET_RELAY, DO_SET_CAM_TRIGG_DIST, ...
+                        // CONDITION_DELAY/112, CONDITION_DISTANCE/114, CONDITION_YAW/115
                         Log.Info($"Skipped mission item {i} ({originalWaypoints[i].Command})");
                         break;
                 }
@@ -913,10 +922,10 @@ public class RoverMavLinkConnection : AsyncScript
         {
             MissionBusAdapter.Send(new ConnectionMsg.ClearMission());
             // Shouldn't this be handled by missionServiceEx? -- seems it doesn't though.
-            var cts = new CancellationTokenSource();
+            //var cts = new CancellationTokenSource();
             // Use global CTS?
-            missionServiceEx.StopMission(cts.Token);
-            missionServiceEx.ClearItems();
+            //missionServiceEx.StopMission(cts.Token);
+            //missionServiceEx.ClearItems();
             await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted, msg.SystemId, msg.ComponentId);
         });
         //missionService.OnMissionSetCurrent -- lifted to missionServiceEx.Current
@@ -1020,12 +1029,17 @@ public class RoverMavLinkConnection : AsyncScript
         //});
         modeService.CurrentMode.Subscribe(modeHandler =>
         {
-            Log.Info($"Current mode changed: {modeHandler.Mode.Name}");
-            // It's probably better to check this by type, not by name
-            if(modeHandler.Mode.Name == ArduRoverMode.SmartRtl.Name)
+            var mavlinkMode = (ArduRoverMode)modeHandler.Mode;
+            Log.Info($"Current mode change request: {mavlinkMode.Name}");
+            var mode = mavlinkMode switch
             {
-                MissionBusAdapter.Send(new ConnectionMsg.SmartRtl());
-            }
+                var m when m == ArduRoverMode.SmartRtl  => RoverController.RoverMode.RTL,
+                var m when m == ArduRoverMode.Auto      => RoverController.RoverMode.Auto,
+                var m when m == ArduRoverMode.Guided    => RoverController.RoverMode.Guided,
+                var m when m == ArduRoverMode.Manual    => RoverController.RoverMode.Manual,
+                _                                       => RoverController.RoverMode.Hold
+            };
+            MissionBusAdapter.Send(new ConnectionMsg.SetMode(mode));
         });
 
         modeService.Start();

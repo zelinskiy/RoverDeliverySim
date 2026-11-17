@@ -47,9 +47,9 @@ namespace RoverDeliverySim
             {
                 throw new ArgumentException("Navigation Network shall have at least 2 points");
             }
-            //MissionBusAdapter = Entity.Get<RoverMavLinkConnection>().MissionBusAdapter;
-            //MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);            
-            RunTestMission();
+            MissionBusAdapter = Entity.Get<RoverMavLinkConnection>().MissionBusAdapter;
+            MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);            
+            //RunTestMission();
         }
 
         private void RunTestMission()

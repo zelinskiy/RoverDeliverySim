@@ -63,8 +63,7 @@ namespace RoverDeliverySim
             Status = MissionStatus.Ready;
             Seq = 0;
         }        
-        public void Start() => Status = MissionStatus.Running;
-        
+        public void Start() => Status = MissionStatus.Running;        
         public void Pause() => Status = MissionStatus.Paused;
         public void Cancel() => Status = MissionStatus.Paused;
         public void Abort() => Status = MissionStatus.Failed;
@@ -85,6 +84,10 @@ namespace RoverDeliverySim
             return new RoverMission(Waypoints.Take(Seq + 1).Reverse().ToList());
         }
 
-        
+        public static IEnumerable<Vector2> SmartRtl(IReadOnlyList<Vector2> points, int i, bool isLast)
+        {
+            var retrace = points.Take(i - 1).Reverse();
+            return isLast ? retrace : retrace.Concat(points.Skip(1).Take(i - 1));
+        }
     }
 }

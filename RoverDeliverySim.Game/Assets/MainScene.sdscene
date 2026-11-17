@@ -61,8 +61,6 @@ Hierarchy:
                         Materials: {}
                     685a1aee78d9c0b35d681fff16e4dee4: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
-                        Mission: null
-                        MissionBusAdapter: null
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
                         NavNetwork: ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e

@@ -5,6 +5,7 @@ using Asv.Mavlink.Ardupilotmega;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Diagnostic;
 using Asv.Mavlink.Minimal;
+using CommunityToolkit.HighPerformance;
 using DotNext;
 using Geodesy;
 using R3;
@@ -24,8 +25,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using static System.Net.Mime.MediaTypeNames;
+using ArduPilotCmd = Asv.Mavlink.Ardupilotmega.MavCmd;
 using MavCmd = Asv.Mavlink.Common.MavCmd;
-//using ArduPilotCmd = Asv.Mavlink.Ardupilotmega.MavCmd;
 
 namespace RoverDeliverySim;
 
@@ -853,25 +854,70 @@ public class RoverMavLinkConnection : AsyncScript
         {
             Log.Info($"Mission waypoint reached: {m}");
         });
+        // TODO:
+        // NAV_LOITER_UNLIM, NAV_LOITER_TIME
+        // NAV_DELAY
+        // NAV_RETURN_TO_LAUNCH
+        // DO_JUMP/177 -- jump to %seq%
+        // DO_CHANGE_SPEED, DO_SET_SERVO, DO_SET_RELAY, DO_SET_CAM_TRIGG_DIST, ...
+        // CONDITION_DELAY/112, CONDITION_DISTANCE/114, CONDITION_YAW/115
         // missionService.OnMissionAck on RX channel only
         missionService.Core.Connection.OnTxMessage
             .FilterByType<MissionAckPacket>()
             .Where(p => p.FullId == MavlinkId)
             .Subscribe(msg =>
         {
-            var originalWaypoints = missionServiceEx.Items.Select(i => (i.X, i.Y));
+            if(missionServiceEx.Items.Count == 0)
+            {
+                return;
+            }
+            var originalWaypoints = missionServiceEx.Items
+                .Select(i => (i.X, i.Y, i.Command))
+                .ToList();
             Log.Info($"Mavlink mission endpoints: {string.Join(", ", originalWaypoints)}");
-            var strideWaypoints = originalWaypoints.Select(i => {
-                var mp = PositionUtils.MavlinkToStride(i.X, i.Y);
-                return new Vector2(mp.X, mp.Z);
-            }).ToList();
+
+            var points = originalWaypoints
+                .Select(wp => PositionUtils.MavlinkToStride(wp.X, wp.Y).XZ())
+                .ToList();
+
+            // By MAVLINK convention, wp 0 is home
+            var homePos = points[0];
+            List<Vector2> strideWaypoints = [homePos]; 
+            for (int i = 1; i < originalWaypoints.Count; i++)
+            {
+                switch (originalWaypoints[i].Command)
+                {
+                    case MavCmd.MavCmdDoSetHome:
+                        homePos = points[i];
+                        strideWaypoints[0] = homePos;
+                        break;
+                    case MavCmd.MavCmdNavWaypoint:
+                        strideWaypoints.Add(points[i]);
+                        break;
+                    //ArduPilotCmd.SmartRtl?
+                    case MavCmd.MavCmdNavReturnToLaunch:
+                        // We always do RTL the smart way
+                        var rtlWaypoints = RoverMission.SmartRtl(points, i, isLast: i == originalWaypoints.Count - 1);
+                        strideWaypoints.AddRange(rtlWaypoints);
+                        break;
+                    default:
+                        Log.Info($"Skipped mission item {i} ({originalWaypoints[i].Command})");
+                        break;
+                }
+            }
             Log.Info($"Stride mission endpoints: {string.Join(", ", strideWaypoints)}");
             var mission = new RoverMission(strideWaypoints);
             MissionBusAdapter.Send(new ConnectionMsg.LoadMission(mission));
         });
-        missionService.OnMissionClearAll.Subscribe(msg =>
+        missionService.OnMissionClearAll.Subscribe(async msg =>
         {
             MissionBusAdapter.Send(new ConnectionMsg.ClearMission());
+            // Shouldn't this be handled by missionServiceEx? -- seems it doesn't though.
+            var cts = new CancellationTokenSource();
+            // Use global CTS?
+            missionServiceEx.StopMission(cts.Token);
+            missionServiceEx.ClearItems();
+            await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted, msg.SystemId, msg.ComponentId);
         });
         //missionService.OnMissionSetCurrent -- lifted to missionServiceEx.Current
 

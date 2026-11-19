@@ -5,6 +5,7 @@ using Asv.Mavlink.Ardupilotmega;
 using Asv.Mavlink.Common;
 using Asv.Mavlink.Diagnostic;
 using Asv.Mavlink.Minimal;
+using CommunityToolkit.HighPerformance;
 using DotNext;
 using Geodesy;
 using R3;
@@ -17,23 +18,65 @@ using Stride.Physics;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Collections.Specialized;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Timers;
 using static System.Net.Mime.MediaTypeNames;
+using ArduPilotCmd = Asv.Mavlink.Ardupilotmega.MavCmd;
 using MavCmd = Asv.Mavlink.Common.MavCmd;
 
 namespace RoverDeliverySim;
 
 
+// Controller -> Connection
+public abstract record ControllerMsg
+{
+    public sealed record WaypointReached(ushort Seq) : ControllerMsg;
+    public sealed record Fail(string Reason) : ControllerMsg;
+}
 
+// Connection -> Controller
+public abstract record ConnectionMsg
+{
+    public sealed record LoadMission(RoverMission Mission) : ConnectionMsg;
+    public sealed record StartMission : ConnectionMsg;
+    public sealed record ClearMission : ConnectionMsg;
+    public sealed record CancelMission : ConnectionMsg;
+    public sealed record PauseMission : ConnectionMsg;
+    public sealed record FinishMission : ConnectionMsg;
+    public sealed record ChangeWaypoint(ushort Seq) : ConnectionMsg;
+    public sealed record SetMode(RoverController.RoverMode Mode) : ConnectionMsg;
+}
+public sealed class MissionBus
+{
+    private readonly Subject<ControllerMsg> _fromController = new();
+    private readonly Subject<ConnectionMsg> _fromConnection = new();
+
+    public Observable<ControllerMsg> FromController => _fromController;
+    public Observable<ConnectionMsg> FromConnection => _fromConnection;
+
+    public void Send(ControllerMsg m) => _fromController.OnNext(m);
+    public void Send(ConnectionMsg m) => _fromConnection.OnNext(m);
+}
+
+
+// TODO: Move all mission-related mavlink stuff in a separate component
+// TODO: Loose coupling Controller <-> Connection
 public class RoverMavLinkConnection : AsyncScript
 {
     // TODO: 
     // - Handle SYSTEM_TIME
     // - Handle MSG_SET_INTERVAL: Param1 = 242, 245
     // mavproxy --master=udpin:127.0.0.1:14550 --out=udpout:192.168.1.50:14560 [--no-console]
+
+    // Events used to communicate with RoverController:
+    public MissionBus MissionBusAdapter { get; } = new();
+
+    // TODO: private class UDPConfig
+    // UDP configuration:
     public int RemotePort = 14550;
     public string RemoteHost = "127.0.0.1";
     public int LocalPort = 14560;
@@ -46,6 +89,7 @@ public class RoverMavLinkConnection : AsyncScript
     //);
     private MavlinkHeartbeatServerConfig _heartbeatConfig;
     private CancellationTokenSource _cts;
+    // TODO: Move all this stuff to a separate static class.
     private static readonly MavlinkIdentity MavlinkId = new(1, 1);
     // To disable single sensor:
     // var sensors = Sensors & ~MavSysStatusSensor.MavSysStatusSensorGps;
@@ -175,7 +219,7 @@ public class RoverMavLinkConnection : AsyncScript
         ("AHRS_ORIENTATION", 0f,   MavParamType.MavParamTypeInt32),
     ];
 
-    private new readonly Logger Log = GlobalLogger.GetLogger("MAVLink");
+    private new readonly TaggedLogger Log = new("RoverMAVLink");
     private static readonly List<ArduRoverMode> SupportedModes =
     [ ArduRoverMode.Manual
     //, ArduRoverMode.Steering, do we need it?
@@ -210,9 +254,10 @@ public class RoverMavLinkConnection : AsyncScript
     {
         private readonly ArduRoverMode _mode;
 
-        public RoverModeHandler(Logger log, ICustomMode mode)
+        public RoverModeHandler(Action<string> logCall, Action<ConnectionMsg> roverBusCall, ICustomMode mode)
         {
-            Log = log;
+            LogCall = logCall;
+            RoverBusCall = roverBusCall;
             if (mode is ArduRoverMode roverMode)
             {
                 _mode = roverMode;
@@ -224,20 +269,28 @@ public class RoverMavLinkConnection : AsyncScript
         }
         public ArduRoverMode Mode => _mode;
         ICustomMode IWorkModeHandler.Mode => _mode;
-        public Logger Log { get; }
+        private Action<string> LogCall;
+        private Action<ConnectionMsg> RoverBusCall;
         public Task Init(CancellationToken cancel)
         {
-            Log.Info($"Handler for {_mode.Name} mode created");
-            //if (mode == ArduCopterMode.Guided)
-            //{
-            //    Log.Info($"Handler for Guided mode created");
-            //}
+            LogCall($"Handler for {_mode.Name} mode created");
+            var mode = _mode switch
+            {
+                var m when m == ArduRoverMode.SmartRtl  => RoverController.RoverMode.RTL,
+                var m when m == ArduRoverMode.Rtl       => RoverController.RoverMode.RTL,                
+                var m when m == ArduRoverMode.Auto      => RoverController.RoverMode.Auto,
+                var m when m == ArduRoverMode.Guided    => RoverController.RoverMode.Guided,
+                var m when m == ArduRoverMode.Manual    => RoverController.RoverMode.Manual,
+                var m when m == ArduRoverMode.Steering  => RoverController.RoverMode.Manual,
+                _                                       => RoverController.RoverMode.Hold
+            };
+            RoverBusCall(new ConnectionMsg.SetMode(mode));
             return Task.CompletedTask;
         }
 
         public Task Destroy(CancellationToken cancel)
         {
-            Log.Info($"Handler for {_mode.Name} mode destroyed");
+            LogCall($"Handler for {_mode.Name} mode destroyed");
             //if (mode == ArduCopterMode.Guided)
             return Task.CompletedTask;
         }
@@ -246,7 +299,6 @@ public class RoverMavLinkConnection : AsyncScript
 
         }
     }
-
 
     public override async Task Execute()
     {
@@ -286,6 +338,9 @@ public class RoverMavLinkConnection : AsyncScript
                 builder.RegisterCommandLongEx();
                 builder.RegisterMission();
                 builder.RegisterMissionEx();
+                //builder.RegisterMissionClient();
+                //builder.Register<MissionClient>(x => { });
+                //builder.Register<MissionClientEx>(x => { });
                 builder.RegisterStatus();
 
                 // Can't use the standard mode microservice since it got mode mapping implemented
@@ -295,7 +350,7 @@ public class RoverMavLinkConnection : AsyncScript
                 builder.RegisterMode(
                     ArduRoverMode.Hold,
                     SupportedModes,
-                    mode => new RoverModeHandler(Log, mode)
+                    mode => new RoverModeHandler(Log.Info, MissionBusAdapter.Send, mode)
                 );
 
                 //builder.RegisterFtpEx(); // File transfer
@@ -359,8 +414,8 @@ public class RoverMavLinkConnection : AsyncScript
 
     private IProtocolRouter SetupRouter(IProtocolFactory protocol)
     {
-        Log.Info($"[MAVLink] Listening on {LocalHost}:{LocalPort} (Rover)");
-        Log.Info($"[MAVLink] Sending to {RemoteHost}:{RemotePort} (GCS)");
+        Log.Info($"Listening on {LocalHost}:{LocalPort} (Rover)");
+        Log.Info($"Sending to {RemoteHost}:{RemotePort} (GCS)");
 
         var router = protocol.CreateRouter("ROUTER");
         router.AddUdpPort(p =>
@@ -376,12 +431,12 @@ public class RoverMavLinkConnection : AsyncScript
             port.EndpointAdded.Subscribe(ep =>
             {
                 if (ep.GetPortId() == LocalPort.ToString()) return;
-                Log.Info($"[MAVLink] Endpoint added: {ep.DisplayName}");
+                Log.Info($"Endpoint added: {ep.DisplayName}");
             });
             port.EndpointRemoved.Subscribe(ep =>
             {
                 if (ep.GetPortId() == LocalPort.ToString()) return;
-                Log.Info($"[MAVLink] Endpoint removed: {ep.DisplayName}");
+                Log.Info($"Endpoint removed: {ep.DisplayName}");
             });
         }
 
@@ -394,11 +449,9 @@ public class RoverMavLinkConnection : AsyncScript
             }
             if (msg is MavlinkV2Message mavlinkMsg && mavlinkMsg.FullId != MavlinkId)
             {
-                Log.Info($"[MAVLink] Received {mavlinkMsg.Name} from ({mavlinkMsg.SystemId}, {mavlinkMsg.ComponentId})");
+                Log.Info($"Received {mavlinkMsg.Name} from ({mavlinkMsg.SystemId}, {mavlinkMsg.ComponentId})");
                 if (msg is FileTransferProtocolPacket ftpPacket)
-                {
-                    // Unfortunately suppressing
-                    // Construct an explicit NAK response indicating failure/unsupported session
+                {                    
                     var responsePacket = new FileTransferProtocolPacket();
                     responsePacket.Payload.TargetSystem = ftpPacket.SystemId;
                     responsePacket.Payload.TargetComponent = ftpPacket.ComponentId;
@@ -412,7 +465,7 @@ public class RoverMavLinkConnection : AsyncScript
                 }
                 else if (msg is CommandLongPacket cmdLong)
                 {
-                    Log.Info($"[MAVLink] Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
+                    Log.Info($"Mavlink CMD_LONG: {cmdLong.Payload.Command}, " +
                         $"Params: {cmdLong.Payload.Param1}:" +
                         $"{cmdLong.Payload.Param2}:" +
                         $"{cmdLong.Payload.Param3}:" +
@@ -423,7 +476,7 @@ public class RoverMavLinkConnection : AsyncScript
                 }
                 else if (msg is CommandIntPacket cmdInt)
                 {
-                    Log.Info($"[MAVLink] Mavlink CMD_INT: {cmdInt.Payload.Command}, " +
+                    Log.Info($"Mavlink CMD_INT: {cmdInt.Payload.Command}, " +
                         $"Params: {cmdInt.Payload.Param1}:" +
                         $"{cmdInt.Payload.Param2}:" +
                         $"{cmdInt.Payload.Param3}:" +
@@ -439,11 +492,11 @@ public class RoverMavLinkConnection : AsyncScript
                 {
                     return;
                 }
-                else if (msg.Name == "STATUSTEXT" && msg is StatustextPacket statusMsg)
+                else if (msg is StatustextPacket statusMsg)
                 {
                     Log.Info($"Sent status msg [{statusMsg.Payload.Severity}]: {string.Concat(statusMsg.Payload.Text)}");
                 }
-                Log.Info($"[MAVLink] Transmitted {msg.Name}");
+                Log.Info($"Transmitted {msg.Name}");
             }
         });
         return router;
@@ -509,23 +562,12 @@ public class RoverMavLinkConnection : AsyncScript
         heartbeatService.Set(hb =>
         {
             var modeService = _serverDevice.GetMode();
-            modeService.CurrentMode.CurrentValue.Mode.GetCommandLongArgs(
-                out var baseMode,
-                out var customMode,
-                out var customSubMode
-            );
             modeService.CurrentMode.CurrentValue.Mode.Fill(hb);
-            //Log.Info($"Current mode: {modeService.CurrentMode.CurrentValue.Mode.Name}; {baseMode}:{customMode}");
-
-            //MavMode.
+            
             hb.Type = MavType.MavTypeGroundRover;
             // QGC has hardcoded mode flags from Ardupilot
             //hb.Autopilot = MavAutopilot.MavAutopilotArdupilotmega;
             hb.Autopilot = MavAutopilot.MavAutopilotArdupilotmega;
-            //hb.BaseMode = (MavModeFlag)baseMode;
-            //hb.BaseMode = MavModeFlag.MavModeFlagCustomModeEnabled;
-            // Bit flags: can add e.g. | MavModeFlag.MavModeFlagSafetyArmed;
-            //hb.CustomMode = 4;
             hb.SystemStatus = MavState.MavStateActive;
             hb.MavlinkVersion = 3;
         });
@@ -574,12 +616,12 @@ public class RoverMavLinkConnection : AsyncScript
         if (!commandIntService.IsInit) await commandIntService.Init(_cts.Token);
         commandIntService[MavCmd.MavCmdGetHomePosition] = async (id, packet, ct) =>
         {
-            Log.Info("[MAVLink] Get home called");
+            Log.Info("Get home called");
             return CommandResult.Accepted;
         };
         commandIntService[MavCmd.MavCmdDoSetHome] = async (id, packet, ct) =>
         {
-            Log.Info("[MAVLink] Set home called");
+            Log.Info("Set home called");
             return CommandResult.Accepted;
         };
         commandIntService.Start();
@@ -592,7 +634,7 @@ public class RoverMavLinkConnection : AsyncScript
             switch (messageId)
             {
                 case AutopilotVersionPacket.MessageId:
-                    Log.Info("[MAVLink] Requested Autopilot Version");
+                    Log.Info("Requested Autopilot Version");
                     await SendAutopilotVersion();
                     return CommandResult.Accepted;
                 case 395: // URI pointing to a JSON metadata (old)
@@ -617,13 +659,13 @@ public class RoverMavLinkConnection : AsyncScript
         };
         commandLongService[MavCmd.MavCmdDoSetMode] = async (id, packet, ct) =>
         {
-            Log.Info("[MAVLink] Set mode called (LONG)");
+            Log.Info("Set mode called (LONG)");
             var modeService = _serverDevice.GetMode();
             var mode_code = (int)packet.Payload.Param2;
             var mode = ArduRoverMode.FromInt(mode_code);
             if (mode is null || !modeService.AvailableModes.Contains(mode))
             {
-                Log.Info($"[MAVLink] Bad mode: {mode_code}");
+                Log.Info($"Bad mode: {mode_code}");
                 return CommandResult.Denied;
             }
             // From the docs (ModeServer.md):
@@ -637,7 +679,7 @@ public class RoverMavLinkConnection : AsyncScript
             // with firmwares that pack multiple bits inside CustomMode msg, e.g. PX4.
             var hbService = _serverDevice.GetHeartbeat();
             hbService.Set(mode.Fill);
-            Log.Info($"[MAVLink] Changed mode to {mode.Name}");
+            Log.Info($"Changed mode to {mode.Name}");
             return CommandResult.Accepted;
         };
         commandLongService[MavCmd.MavCmdSetMessageInterval] = async (id, packet, ct) =>
@@ -658,12 +700,36 @@ public class RoverMavLinkConnection : AsyncScript
             {
                 Log.Warning($"Requested to set interval for unsupported message {messageId}");
                 return CommandResult.Unsupported;
-            }
-            
+            }            
+        };
+        commandLongService[MavCmd.MavCmdComponentArmDisarm] = async (id, packet, ct) =>
+        {
+            var armed = packet.Payload.Param1 == 1;
+            Log.Info($"Arm/disarm requested: {packet.Payload.Param1}");
+            var hbService = _serverDevice.GetHeartbeat();
+            hbService.Set(hb =>
+            {
+                if (armed)
+                {
+                    hb.BaseMode |= MavModeFlag.MavModeFlagSafetyArmed;
+                }
+                else
+                {
+                    hb.BaseMode &= ~MavModeFlag.MavModeFlagSafetyArmed;
+                }                
+            });
+            return CommandResult.Accepted;
+        };
+        // TODO: Duplicates missionServiceEx[MavCmd.MavCmdNavReturnToLaunch]!
+        commandLongService[MavCmd.MavCmdNavReturnToLaunch] = async (id, packet, ct) =>
+        {
+            Log.Info($"Mission RTL");
+            MissionBusAdapter.Send(new ConnectionMsg.SetMode(RoverController.RoverMode.RTL));
+            return CommandResult.Accepted;
         };
         commandLongService.Start();
     }
-
+    
     private async Task SendAvailableModes()
     {
         var modeService = _serverDevice.GetMode();
@@ -698,13 +764,181 @@ public class RoverMavLinkConnection : AsyncScript
         // --- CHANGE ACTIVE ITEM ---
         // COMMAND_LONG (MAV_CMD_DO_SET_MISSION_CURRENT) -> COMMAND_ACK + MISSION_CURRENT (Broadcast)
 
-        missionServiceEx[MavCmd.MavCmdDoSetMissionCurrent] = async (item, ct) =>
+        missionServiceEx[MavCmd.MavCmdNavWaypoint] = async (item, ct) =>
         {
-            Log.Info($"Mission SET_CURRENT {item.Seq}");
-            await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted);
-            await missionService.SendMissionCurrent(item.Seq);
+            Log.Info($"Moving to waypoint {item.Seq} ({item.X}, {item.Y})");
+            var controllerListener = MissionBusAdapter.FromController
+                .Where(m =>
+                    m is ControllerMsg.Fail
+                    || m is ControllerMsg.WaypointReached r
+                    && r.Seq == item.Seq
+                ).FirstAsync(ct);
+            MissionBusAdapter.Send(new ConnectionMsg.ChangeWaypoint(item.Seq));
+            try
+            {
+                var controllerMsg = await controllerListener;
+                if (controllerMsg is ControllerMsg.Fail f)
+                {
+                    Log.Error($"Waypoint execution failed: {f.Reason}");
+                    //throw new InvalidOperationException(f.Reason);
+                }
+                    
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                Log.Warning($"Waypoint {item.Seq} cancelled.");
+                MissionBusAdapter.Send(new ConnectionMsg.CancelMission());
+                //throw;
+            }            
         };
+        missionServiceEx[MavCmd.MavCmdMissionStart] = async (item, ct) =>
+        {
+            Log.Info($"Mission START");
+            missionService.Start();
+            MissionBusAdapter.Send(new ConnectionMsg.StartMission());
+            //await Task.Delay(TimeSpan.FromSeconds(3), ct);
+            // TODO: send MAV_RESULT_ACCEPTED? Or is it done by mission service?
+        };
+        missionServiceEx[MavCmd.MavCmdNavReturnToLaunch] = async (item, ct) =>
+        {
+            Log.Info($"Mission RTL");
+            MissionBusAdapter.Send(new ConnectionMsg.SetMode(RoverController.RoverMode.RTL));
+        };
+        //missionServiceEx[MavCmd.MavCmdDoSetMode] = async (item, ct) =>
+        //{
 
+        //    Log.Info($"SMART_RTL mode enabled");
+        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
+        //};
+        missionServiceEx.State.Subscribe(m => 
+        {
+            Log.Info($"Mission state changed: {m}");
+            ConnectionMsg command = m switch
+            {
+                MissionServerState.Idle => new ConnectionMsg.PauseMission(),
+                MissionServerState.Canceled => new ConnectionMsg.CancelMission(),
+                MissionServerState.Running => new ConnectionMsg.StartMission(),
+                MissionServerState.CompleteSuccess => new ConnectionMsg.FinishMission(),
+                _ => throw new NotImplementedException(),
+            };
+            MissionBusAdapter.Send(command);
+        });
+        missionServiceEx.Current.Subscribe(m =>
+        {
+            Log.Info($"Current mission item changed: {m}");
+            MissionBusAdapter.Send(new ConnectionMsg.ChangeWaypoint(m));
+        });
+        missionServiceEx.Items.CollectionChanged += (in e) =>
+        {
+            switch (e.Action, e.IsSingleItem)
+            {
+                case (NotifyCollectionChangedAction.Add, true):
+                    {
+                        Log.Info($"Mission item added: {e.NewItem.Seq}");
+                        break;
+                    }
+                case (NotifyCollectionChangedAction.Add, false):
+                    {
+                        var new_items = e.NewItems.ToArray().Select(i => i.Seq);
+                        Log.Info($"Mission items added: {string.Join(",", new_items)}");
+                        break;
+                    }                    
+                case (NotifyCollectionChangedAction.Remove, true):
+                    {
+                        Log.Info($"Mission item removed: {e.OldItem.Seq}");
+                        break;
+                    }
+                case (NotifyCollectionChangedAction.Remove, false):
+                    {
+                        var old_items = e.OldItems.ToArray().Select(i => i.Seq);
+                        Log.Info($"Mission items removed: {string.Join(",", old_items)}");
+                        break;
+                    }
+                case (NotifyCollectionChangedAction.Replace or NotifyCollectionChangedAction.Reset, _):
+                    {
+                        var new_items = e.NewItems.ToArray().Select(i => i.Seq);
+                        var old_items = e.OldItems.ToArray().Select(i => i.Seq);
+                        Log.Info($"Mission item changed: {string.Join(",", old_items)} => {string.Join(",", old_items)}");
+                        break;
+                    }
+                default:
+                    throw new NotImplementedException();
+            }
+        };
+        missionServiceEx.Reached.Subscribe(m =>
+        {
+            Log.Info($"Mission waypoint reached: {m}");
+        });
+        // missionService.OnMissionAck handles RX channel only
+        missionService.Core.Connection.OnTxMessage
+            .FilterByType<MissionAckPacket>()
+            .Where(p => p.FullId == MavlinkId)
+            .Subscribe(msg =>
+        {
+        if (missionServiceEx.Items.Count == 0)
+        {
+            // Mission cleared
+            return;
+        }
+        var originalWaypoints = missionServiceEx.Items
+            .Select(i => (i.X, i.Y, i.Command))
+            .ToList();
+        Log.Info($"Mavlink mission endpoints: {string.Join(", ", originalWaypoints)}");
+
+        var points = originalWaypoints
+            .Select(wp => PositionUtils.MavlinkToStride(wp.X, wp.Y).XZ())
+            .ToList();
+
+        // By MAVLINK convention, wp 0 is home
+        var homePos = points[0];
+        List<Vector2> strideWaypoints = [homePos];
+        for (int i = 1; i < originalWaypoints.Count; i++)
+        {
+            switch (originalWaypoints[i].Command)
+            {
+                case MavCmd.MavCmdDoSetHome:
+                    homePos = points[i];
+                    strideWaypoints[0] = homePos;
+                    break;
+                case MavCmd.MavCmdNavWaypoint:
+                    strideWaypoints.Add(points[i]);
+                    break;
+                //ArduPilotCmd.SmartRtl?
+                case MavCmd.MavCmdNavReturnToLaunch:
+                    //strideWaypoints.Add(homePos);
+                    // Quick and dirty fix to match wp count in both lists
+                    strideWaypoints.Add(points[i-1]);
+                    //strideWaypoints.AddRange(strideWaypoints.Reverse<Vector2>().Skip(1));
+                    break;
+                default:
+                    // TODO:
+                    // NAV_LOITER_UNLIM, NAV_LOITER_TIME
+                    // NAV_DELAY
+                    // NAV_RETURN_TO_LAUNCH
+                    // DO_JUMP/177 -- jump to %seq%
+                    // DO_CHANGE_SPEED, DO_SET_SERVO, DO_SET_RELAY, DO_SET_CAM_TRIGG_DIST, ...
+                    // CONDITION_DELAY/112, CONDITION_DISTANCE/114, CONDITION_YAW/115
+                    Log.Info($"Skipped mission item {i} ({originalWaypoints[i].Command})");
+                    break;
+                }
+            }
+            Log.Info($"Stride mission endpoints: {string.Join(", ", strideWaypoints)}");
+            var mission = new RoverMission(strideWaypoints);
+            MissionBusAdapter.Send(new ConnectionMsg.LoadMission(mission));
+        });
+        missionService.OnMissionClearAll.Subscribe(async msg =>
+        {
+            MissionBusAdapter.Send(new ConnectionMsg.ClearMission());
+            // Shouldn't this be handled by missionServiceEx? -- seems it doesn't though.
+            //var cts = new CancellationTokenSource();
+            // Use global CTS?
+            //missionServiceEx.StopMission(cts.Token);
+            //missionServiceEx.ClearItems();
+            await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted, msg.SystemId, msg.ComponentId);
+        });
+        //missionService.OnMissionSetCurrent -- lifted to missionServiceEx.Current
+        
+        Log.Info($"Mission service started, available commands: {string.Join(", ", missionServiceEx.SupportedCommands)}");
         await missionServiceEx.Init(_cts.Token);
         missionServiceEx.Start();
     }
@@ -803,7 +1037,17 @@ public class RoverMavLinkConnection : AsyncScript
         //});
         modeService.CurrentMode.Subscribe(modeHandler =>
         {
-            Log.Info($"Current mode changed: {modeHandler.Mode.Name}");
+            var mavlinkMode = (ArduRoverMode)modeHandler.Mode;
+            Log.Info($"Current mode change request: {mavlinkMode.Name}");
+            var mode = mavlinkMode switch
+            {
+                var m when m == ArduRoverMode.SmartRtl  => RoverController.RoverMode.RTL,
+                var m when m == ArduRoverMode.Auto      => RoverController.RoverMode.Auto,
+                var m when m == ArduRoverMode.Guided    => RoverController.RoverMode.Guided,
+                var m when m == ArduRoverMode.Manual    => RoverController.RoverMode.Manual,
+                _                                       => RoverController.RoverMode.Hold
+            };
+            MissionBusAdapter.Send(new ConnectionMsg.SetMode(mode));
         });
 
         modeService.Start();
@@ -831,11 +1075,8 @@ public class RoverMavLinkConnection : AsyncScript
     {
         var packet = createPacket<GlobalPositionIntPacket, GlobalPositionIntPayload>((payload, t, rb) =>
         {
-            var pos = t.Position;
-            payload.Lat = (int)(SaveMapImageScript.SceneOriginLat * Math.Pow(10, 7) - pos.Z * 100);
-            payload.Lon = (int)(SaveMapImageScript.SceneOriginLon * Math.Pow(10, 7) + pos.X * 100);
-            payload.Alt = (int)(SaveMapImageScript.SceneOriginAlt * 1000 - pos.Y * 1000);
-            payload.RelativeAlt = payload.Alt;
+            (payload.Lat, payload.Lon, payload.Alt, payload.RelativeAlt) = 
+                PositionUtils.StrideToMavlink(t.Position);
 
             var v = rb.LinearVelocity;
             payload.Vx = (short)(-v.Z * 100);

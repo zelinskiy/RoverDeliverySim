@@ -12,6 +12,7 @@ public class TileServer : AsyncScript{
     private HttpListener _listener;
     // TODO: pass proper cancellation token;
     private bool _isRunning;
+    // QGC string: http://localhost:8080/map.png?X={x}&Y={y}&Z={z}
     private string _url = "http://localhost:8080/";
     public void StartServer()
     {

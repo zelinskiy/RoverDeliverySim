@@ -9,11 +9,19 @@ namespace RoverDeliverySim
         public CameraComponent Camera;
         public Entity MouseClickSphere { get; set; }
         public Entity Rover { get; set; }
+        private RoverController RoverController;
         private float showMouseClickDelay;
+
+        public override void Start()
+        {
+            RoverController = Rover.Get<RoverController>();
+        }
 
         public override void Update()
         {
-            if (Input.HasMouse && Input.IsMouseButtonPressed(MouseButton.Left))
+            bool canClick = RoverController.Mode == RoverController.RoverMode.Guided;
+            bool clicked = Input.HasMouse && Input.IsMouseButtonPressed(MouseButton.Left);
+            if (canClick && clicked)
             {
                 Vector2 mousePos = Input.MousePosition;
                 Ray ray = ScreenToWorldRay(mousePos, Camera);
@@ -21,7 +29,7 @@ namespace RoverDeliverySim
 
                 if (ray.Intersects(ref groundPlane, out Vector3 hitPoint))
                 {
-                    // 1. Show click indicator sphere
+                    // Show click indicator sphere
                     if (MouseClickSphere != null)
                     {
                         var modelComp = MouseClickSphere.Get<ModelComponent>();
@@ -32,16 +40,8 @@ namespace RoverDeliverySim
                         MouseClickSphere.Transform.Position = hitPoint;
                         MouseClickSphere.Transform.Position.Y = mouseClickY;
                     }
-
-                    // 2. Send target position to the Rover!
-                    if (Rover != null)
-                    {
-                        var roverController = Rover.Get<RoverController>();
-                        if (roverController != null)
-                        {
-                            roverController.TargetPosition = hitPoint;
-                        }
-                    }
+                    // Guide the rover
+                    RoverController.TargetPosition = hitPoint.XZ();
                 }
             }
 

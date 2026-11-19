@@ -45,6 +45,8 @@ public class RoverController : SyncScript
     // TODO: mk method to hide from editor
     [DataMemberIgnore]
     public Vector2? TargetPosition { get; set; } = null;
+    [DataMemberIgnore]
+    public Vector2 HomePosition { get; set; }
     public RoverMode Mode { get; private set; } = RoverMode.Hold;
 
     public override void Start()
@@ -60,8 +62,32 @@ public class RoverController : SyncScript
             throw new ArgumentException("Navigation Network shall have at least 2 points");
         }
         MissionBusAdapter = Entity.Get<RoverMavLinkConnection>().MissionBusAdapter;
-        MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);            
+        MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);
+        HomePosition = Entity.Transform.Position.XZ();
         //RunTestMission();
+    }
+
+    public override void Update()
+    {
+        switch (Mode)
+        {
+            case RoverMode.Hold:
+                return;
+            case RoverMode.Manual:
+                HandleInput();
+                return;
+            case RoverMode.Auto:
+                HandleMission();
+                return;
+            case RoverMode.Guided:
+                if (TargetPosition is Vector2 target)
+                    RideTo(target);                    
+                return;
+            case RoverMode.RTL:
+                // TODO: Trace smart way back home even without set mission
+                HandleSmartRtlMission();
+                return;
+        }
     }
 
     private void RunTestMission()
@@ -100,7 +126,7 @@ public class RoverController : SyncScript
                 Mission.Reset();
                 return;
             case ConnectionMsg.StartMission:
-                Log.Info("Start mission");                    
+                Log.Info("Start mission");
                 Mission.Start();
                 TargetPosition = Mission.Target;
                 return;
@@ -111,6 +137,7 @@ public class RoverController : SyncScript
                 return;
             case ConnectionMsg.FinishMission:
                 Log.Info("Mission finished");
+                Mode = RoverMode.Hold;
                 Mission.Finish();
                 TargetPosition = null;
                 return;
@@ -138,42 +165,24 @@ public class RoverController : SyncScript
                     if(Mission is not null)
                     {
                         Log.Info($"Executing Smart RTL mission");
-                        Mission.Cancel();
+                        if (!Mission.Finished) Mission.Cancel();
                         SmartRtlMission = Mission.GetSmartRtlMission();
-                        SmartRtlMission.Start();
-                        return;
                     }
                     else
                     {
-                        Log.Warning($"Currently can't execute Smart RTL without a previously set mission");
-                        Mode = RoverMode.Hold;
-                        return;
+                        Log.Info($"Executing direct RTL");
+                        SmartRtlMission = new RoverMission([HomePosition]);
                     }
+                    TargetPosition = SmartRtlMission.Target;
+                    SmartRtlMission.Start();
                 }
                 else if(mode == RoverMode.Auto && Mission is not null)
                 {
                     Mission.Start();
-                    return;
                 }
                 return;
             default:
                 throw new NotImplementedException();
-        }
-    }
-
-    public override void Update()
-    {
-        if (Mission is not null)
-        {
-            HandleMission();
-        }
-        else if (TargetPosition is Vector2 target)
-        {
-            RideTo(target);
-        }
-        else
-        {
-            HandleInput();
         }
     }
 
@@ -203,11 +212,6 @@ public class RoverController : SyncScript
                 var response = new ControllerMsg.WaypointReached(Mission.Seq);
                 MissionBusAdapter.Send(response);
                 TargetPosition = Mission.TargetNextWaypoint();
-                if(Mode == RoverMode.Guided)
-                {
-                    Mission.Pause();
-                    return;
-                }
             }
             RideTo(target);
             return;
@@ -217,23 +221,27 @@ public class RoverController : SyncScript
 
     private void HandleSmartRtlMission()
     {
-        if (SmartRtlMission is null)
+        if (SmartRtlMission is null || SmartRtlMission.Status is not MissionStatus.Running)
         {
             return;
         }
-        if (TargetPosition is not null)
-        {
-            RideTo(SmartRtlMission.Target);
-        }
-        else
-        {
-            TargetPosition = SmartRtlMission.TargetNextWaypoint();
-        }
-        if (Vector2.Distance(Entity.Transform.Position.XZ(), SmartRtlMission.Waypoints.Last()) < WaypointReachedTolerance)
+        var position = Entity.Transform.Position.XZ();
+        if (Vector2.Distance(position, SmartRtlMission.Waypoints.Last()) < WaypointReachedTolerance)
         {
             // TODO: Notify we're home
-            SmartRtlMission = null;
-        }            
+            TargetPosition = null;
+            SmartRtlMission.Finish();
+            return;
+        }
+        if (TargetPosition is Vector2 target)
+        {
+            if (Vector2.Distance(position, target) < WaypointReachedTolerance)
+            {
+                TargetPosition = SmartRtlMission.TargetNextWaypoint();
+            }
+            RideTo(target);
+            return;
+        }                 
     }
 
     private void HandleInput()

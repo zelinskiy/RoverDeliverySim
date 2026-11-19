@@ -81,13 +81,24 @@ namespace RoverDeliverySim
 
         public RoverMission GetSmartRtlMission()
         {
-            return new RoverMission(Waypoints.Take(Seq + 1).Reverse().ToList());
+            return new RoverMission(Waypoints.Take(Seq + 1).Reverse());
         }
 
-        public static IEnumerable<Vector2> SmartRtl(IReadOnlyList<Vector2> points, int i, bool isLast)
+        public static RoverMission operator +(RoverMission m1, RoverMission m2)
         {
-            var retrace = points.Take(i - 1).Reverse();
-            return isLast ? retrace : retrace.Concat(points.Skip(1).Take(i - 1));
+            if(m1 is null && m2 is null)
+            {
+                throw new ArgumentNullException("Can't add two null missions");
+            }
+            else if (m1 is null)
+            {
+                return new RoverMission(m2.Waypoints);
+            }
+            if (m2 is null)
+            {
+                return new RoverMission(m1.Waypoints);
+            }
+            return new RoverMission(m1.Waypoints.Concat(m2.Waypoints));
         }
     }
 }

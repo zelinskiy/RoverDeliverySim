@@ -277,9 +277,11 @@ public class RoverMavLinkConnection : AsyncScript
             var mode = _mode switch
             {
                 var m when m == ArduRoverMode.SmartRtl  => RoverController.RoverMode.RTL,
+                var m when m == ArduRoverMode.Rtl       => RoverController.RoverMode.RTL,                
                 var m when m == ArduRoverMode.Auto      => RoverController.RoverMode.Auto,
                 var m when m == ArduRoverMode.Guided    => RoverController.RoverMode.Guided,
                 var m when m == ArduRoverMode.Manual    => RoverController.RoverMode.Manual,
+                var m when m == ArduRoverMode.Steering  => RoverController.RoverMode.Manual,
                 _                                       => RoverController.RoverMode.Hold
             };
             RoverBusCall(new ConnectionMsg.SetMode(mode));
@@ -449,9 +451,7 @@ public class RoverMavLinkConnection : AsyncScript
             {
                 Log.Info($"Received {mavlinkMsg.Name} from ({mavlinkMsg.SystemId}, {mavlinkMsg.ComponentId})");
                 if (msg is FileTransferProtocolPacket ftpPacket)
-                {
-                    // Unfortunately suppressing
-                    // Construct an explicit NAK response indicating failure/unsupported session
+                {                    
                     var responsePacket = new FileTransferProtocolPacket();
                     responsePacket.Payload.TargetSystem = ftpPacket.SystemId;
                     responsePacket.Payload.TargetComponent = ftpPacket.ComponentId;
@@ -720,9 +720,16 @@ public class RoverMavLinkConnection : AsyncScript
             });
             return CommandResult.Accepted;
         };
+        // TODO: Duplicates missionServiceEx[MavCmd.MavCmdNavReturnToLaunch]!
+        commandLongService[MavCmd.MavCmdNavReturnToLaunch] = async (id, packet, ct) =>
+        {
+            Log.Info($"Mission RTL");
+            MissionBusAdapter.Send(new ConnectionMsg.SetMode(RoverController.RoverMode.RTL));
+            return CommandResult.Accepted;
+        };
         commandLongService.Start();
     }
-
+    
     private async Task SendAvailableModes()
     {
         var modeService = _serverDevice.GetMode();
@@ -792,11 +799,11 @@ public class RoverMavLinkConnection : AsyncScript
             //await Task.Delay(TimeSpan.FromSeconds(3), ct);
             // TODO: send MAV_RESULT_ACCEPTED? Or is it done by mission service?
         };
-        //missionServiceEx[MavCmd.MavCmdNavReturnToLaunch] = async (item, ct) =>
-        //{
-        //    Log.Info($"Mission RTL");
-        //    await Task.Delay(TimeSpan.FromSeconds(3), ct);
-        //};
+        missionServiceEx[MavCmd.MavCmdNavReturnToLaunch] = async (item, ct) =>
+        {
+            Log.Info($"Mission RTL");
+            MissionBusAdapter.Send(new ConnectionMsg.SetMode(RoverController.RoverMode.RTL));
+        };
         //missionServiceEx[MavCmd.MavCmdDoSetMode] = async (item, ct) =>
         //{
 
@@ -861,57 +868,58 @@ public class RoverMavLinkConnection : AsyncScript
         missionServiceEx.Reached.Subscribe(m =>
         {
             Log.Info($"Mission waypoint reached: {m}");
-        });        
+        });
         // missionService.OnMissionAck handles RX channel only
         missionService.Core.Connection.OnTxMessage
             .FilterByType<MissionAckPacket>()
             .Where(p => p.FullId == MavlinkId)
             .Subscribe(msg =>
         {
-            if(missionServiceEx.Items.Count == 0)
-            {
-                // Mission cleared
-                return;
-            }
-            var originalWaypoints = missionServiceEx.Items
-                .Select(i => (i.X, i.Y, i.Command))
-                .ToList();
-            Log.Info($"Mavlink mission endpoints: {string.Join(", ", originalWaypoints)}");
+        if (missionServiceEx.Items.Count == 0)
+        {
+            // Mission cleared
+            return;
+        }
+        var originalWaypoints = missionServiceEx.Items
+            .Select(i => (i.X, i.Y, i.Command))
+            .ToList();
+        Log.Info($"Mavlink mission endpoints: {string.Join(", ", originalWaypoints)}");
 
-            var points = originalWaypoints
-                .Select(wp => PositionUtils.MavlinkToStride(wp.X, wp.Y).XZ())
-                .ToList();
+        var points = originalWaypoints
+            .Select(wp => PositionUtils.MavlinkToStride(wp.X, wp.Y).XZ())
+            .ToList();
 
-            // By MAVLINK convention, wp 0 is home
-            var homePos = points[0];
-            List<Vector2> strideWaypoints = [homePos]; 
-            for (int i = 1; i < originalWaypoints.Count; i++)
+        // By MAVLINK convention, wp 0 is home
+        var homePos = points[0];
+        List<Vector2> strideWaypoints = [homePos];
+        for (int i = 1; i < originalWaypoints.Count; i++)
+        {
+            switch (originalWaypoints[i].Command)
             {
-                switch (originalWaypoints[i].Command)
-                {
-                    case MavCmd.MavCmdDoSetHome:
-                        homePos = points[i];
-                        strideWaypoints[0] = homePos;
-                        break;
-                    case MavCmd.MavCmdNavWaypoint:
-                        strideWaypoints.Add(points[i]);
-                        break;
-                    //ArduPilotCmd.SmartRtl?
-                    case MavCmd.MavCmdNavReturnToLaunch:
-                        // We always do RTL the smart way
-                        var rtlWaypoints = RoverMission.SmartRtl(points, i, isLast: i == originalWaypoints.Count - 1);
-                        strideWaypoints.AddRange(rtlWaypoints);
-                        break;
-                    default:
-                        // TODO:
-                        // NAV_LOITER_UNLIM, NAV_LOITER_TIME
-                        // NAV_DELAY
-                        // NAV_RETURN_TO_LAUNCH
-                        // DO_JUMP/177 -- jump to %seq%
-                        // DO_CHANGE_SPEED, DO_SET_SERVO, DO_SET_RELAY, DO_SET_CAM_TRIGG_DIST, ...
-                        // CONDITION_DELAY/112, CONDITION_DISTANCE/114, CONDITION_YAW/115
-                        Log.Info($"Skipped mission item {i} ({originalWaypoints[i].Command})");
-                        break;
+                case MavCmd.MavCmdDoSetHome:
+                    homePos = points[i];
+                    strideWaypoints[0] = homePos;
+                    break;
+                case MavCmd.MavCmdNavWaypoint:
+                    strideWaypoints.Add(points[i]);
+                    break;
+                //ArduPilotCmd.SmartRtl?
+                case MavCmd.MavCmdNavReturnToLaunch:
+                    //strideWaypoints.Add(homePos);
+                    // Quick and dirty fix to match wp count in both lists
+                    strideWaypoints.Add(points[i-1]);
+                    //strideWaypoints.AddRange(strideWaypoints.Reverse<Vector2>().Skip(1));
+                    break;
+                default:
+                    // TODO:
+                    // NAV_LOITER_UNLIM, NAV_LOITER_TIME
+                    // NAV_DELAY
+                    // NAV_RETURN_TO_LAUNCH
+                    // DO_JUMP/177 -- jump to %seq%
+                    // DO_CHANGE_SPEED, DO_SET_SERVO, DO_SET_RELAY, DO_SET_CAM_TRIGG_DIST, ...
+                    // CONDITION_DELAY/112, CONDITION_DISTANCE/114, CONDITION_YAW/115
+                    Log.Info($"Skipped mission item {i} ({originalWaypoints[i].Command})");
+                    break;
                 }
             }
             Log.Info($"Stride mission endpoints: {string.Join(", ", strideWaypoints)}");
@@ -929,7 +937,7 @@ public class RoverMavLinkConnection : AsyncScript
             await missionService.SendMissionAck(MavMissionResult.MavMissionAccepted, msg.SystemId, msg.ComponentId);
         });
         //missionService.OnMissionSetCurrent -- lifted to missionServiceEx.Current
-
+        
         Log.Info($"Mission service started, available commands: {string.Join(", ", missionServiceEx.SupportedCommands)}");
         await missionServiceEx.Init(_cts.Token);
         missionServiceEx.Start();

@@ -18,4 +18,10 @@
     <PackageReference Include="Stride.UI" Version="4.4.1" />
     <PackageReference Include="Stride.AssetCompiler" Version="4.4.1" IncludeAssets="build;buildTransitive" />
   </ItemGroup>
+
+  <ItemGroup>
+	<None Include="Data/muchobor.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</None>
+  </ItemGroup>
 </Project>

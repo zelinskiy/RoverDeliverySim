@@ -8,7 +8,6 @@ Hierarchy:
     RootParts:
         - ref!! 0353d0ee-edb8-4066-9d71-b77cb03135aa
         - ref!! af112fa1-94b6-47b1-ad49-9eb0ca1fd288
-        - ref!! bcdec293-0c01-4bbf-87dd-f8bf083617a1
         - ref!! ddcfa817-d170-4991-8257-5292ceda03f1
         - ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
         - ref!! 46938bba-05fc-46d8-938e-3ee80d2cc5d5
@@ -18,6 +17,7 @@ Hierarchy:
         - ref!! 2d507826-7be8-46c5-afe4-6e72f38e1bfc
         - ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
         - ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
+        - ref!! 71677f62-7d5d-4ec1-9d5d-ab26722bfd54
     Parts:
         -   Entity:
                 Id: 0353d0ee-edb8-4066-9d71-b77cb03135aa
@@ -55,11 +55,12 @@ Hierarchy:
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children:
                             a9ad407cb0d60d6c5254a42dfa82276f: ref!! 8991e41d-7d83-40c5-9e47-ce92f89637f8
+                            32c11999aeb31be51944553cde2c04f7: ref!! 36883066-2892-431f-a3d3-1ed62c2c909d
                     501ccab78f535cc679dc693bd01f98d4: !ModelComponent
                         Id: ae569d9f-fc04-4746-a3a8-a0ab4ca9f556
                         Model: 8f8ee9bf-c8a2-4630-93f1-e48ad84e9647:Models/Rover
                         Materials: {}
-                    685a1aee78d9c0b35d681fff16e4dee4: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
+                    5d4299c853fb214ac973914afb8f0057: !RoverDeliverySim.RoverController,RoverDeliverySim.Game
                         Id: 204cbfd0-81d0-4273-a227-d38f5af0c26a
                         MoveSpeed: 3.0
                         TurnSpeed: 3.0
@@ -87,7 +88,7 @@ Hierarchy:
                                 Radius: 0.15
                                 LocalOffset: {X: 0.0, Y: 0.15, Z: 0.0}
                                 LocalRotation: {X: 0.70710677, Y: 0.0, Z: 0.0, W: 0.70710677}
-                    590bb1cc72dde64488558361be68b096: !RoverDeliverySim.RoverMavLinkConnection,RoverDeliverySim.Game
+                    5f50ee4489d3c549a3530c68c0571e92: !RoverDeliverySim.RoverMavLinkConnection,RoverDeliverySim.Game
                         Id: 0b30d2a0-dd8d-4e97-a990-b8a4121556f9
                         RemotePort: 14550
                         RemoteHost: 127.0.0.1
@@ -185,6 +186,21 @@ Hierarchy:
                             e341da901005e49e7108f03895aa4fbc: ref!! 93005a95-d2d4-4c31-a325-11b761c5809f
                             35ca93934679d7ddf9ee85661d85f344: ref!! 517b1cf0-0e8f-4080-8331-f58eeda88b50
         -   Entity:
+                Id: 71677f62-7d5d-4ec1-9d5d-ab26722bfd54
+                Name: Neighborhood
+                Components:
+                    9064c1cf4e3723d1d21796b24a6aff13: !TransformComponent
+                        Id: 20c7c13c-18bf-4f97-8032-daeccc1b3959
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children:
+                            afa0808c49c04746ceab6d36ff180c72: ref!! c69eb815-6d97-4d6a-ac10-3165a8613175
+                    9f1d0497c97dde5189bccb2f6be8da34: !RoverDeliverySim.GpsLoader,RoverDeliverySim.Game
+                        Id: 52b514d3-a0c2-4f64-a32a-038aaceac4d7
+                        BuildingPlaceholerTemplate: ref!! 8c54193e-1eb2-4225-9d98-94faf8b000e6
+                        Camera: ref!! bcdec293-0c01-4bbf-87dd-f8bf083617a1
+        -   Entity:
                 Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
                 Name: House
                 Components:
@@ -197,6 +213,20 @@ Hierarchy:
                     efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
                         Id: 59ea7302-1ddb-4954-926c-530cea8038b8
                         Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
+                        Materials: {}
+        -   Entity:
+                Id: 8c54193e-1eb2-4225-9d98-94faf8b000e6
+                Name: GpsBuilding
+                Components:
+                    1ff4d195d977e5114f07df6dc43ee231: !TransformComponent
+                        Id: c69eb815-6d97-4d6a-ac10-3165a8613175
+                        Position: {X: -13.5, Y: 1.0, Z: -3.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 2.0, Y: 2.0, Z: 3.0}
+                        Children: {}
+                    749cce20152a986d25f2e2c8293d17e1: !ModelComponent
+                        Id: 22c65329-ee0b-43c6-9897-cb01d8b61de1
+                        Model: 8cf43d72-7371-4a9a-bd91-517e5c439879:Models/Buildings/GpsBuilding
                         Materials: {}
         -   Entity:
                 Id: 96113b1a-feae-4e46-a4f8-a7d69fa37243
@@ -237,8 +267,8 @@ Hierarchy:
                 Components:
                     72d9ed7a4190b5acd05770ad5b84fb19: !TransformComponent
                         Id: 36883066-2892-431f-a3d3-1ed62c2c909d
-                        Position: {X: 10.183172, Y: 7.2123456, Z: -6.240386}
-                        Rotation: {X: -0.15644962, Y: 0.7838673, Z: 0.20979157, W: 0.5630838}
+                        Position: {X: 0.0, Y: 5.0, Z: 5.0}
+                        Rotation: {X: -0.38268346, Y: 0.0, Z: 0.0, W: 0.9238795}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children: {}
                     441a482c7831e90753a74c30ee109f75: !CameraComponent
@@ -246,11 +276,20 @@ Hierarchy:
                         Name: null
                         Projection: Perspective
                         Slot: 2a651fd0-7ab3-43f0-8de2-d478e7229652
-                    6fc8973adc6ca8b6f405c7c4dbb2fa12: !RoverDeliverySim.GroundClicker,RoverDeliverySim.Game
+                    2a68af024e1c94425eaa878e68cfaf7c: !RoverDeliverySim.GroundClicker,RoverDeliverySim.Game
                         Id: 3032e2b1-26a8-461e-afce-bbe5427df5b1
                         Camera: ref!! 82702b9c-edcd-4e99-943b-0dd2bfdcbb0e
                         MouseClickSphere: ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
                         Rover: ref!! 125e521d-89dc-4bbb-aa8f-228fc185d6f8
+                    89e8f5d4dec8d9d51aa9a6849b77f76e: !RoverDeliverySim.BasicCameraController,RoverDeliverySim.Game
+                        Id: 616daf02-e00d-4c02-ae5f-6ac9cec10910
+                        Gamepad: false
+                        KeyboardMovementSpeed: {X: 5.0, Y: 5.0, Z: 5.0}
+                        TouchMovementSpeed: {X: 0.7, Y: 0.7, Z: 0.3}
+                        SpeedFactor: 5.0
+                        KeyboardRotationSpeed: {X: 3.0, Y: 3.0}
+                        MouseRotationSpeed: {X: 1.0, Y: 1.0}
+                        TouchRotationSpeed: {X: 1.0, Y: 0.7}
         -   Entity:
                 Id: ddcfa817-d170-4991-8257-5292ceda03f1
                 Name: MapViewCamera
@@ -269,9 +308,9 @@ Hierarchy:
                         UseCustomAspectRatio: true
                         AspectRatio: 1.0
                         Slot: aa64ca60-45ba-479a-9a64-0944ddf82284
-                    5e1c42945a918a69529ec335cad7c146: !RoverDeliverySim.TileServer,RoverDeliverySim.Game
+                    98afab4472ecc31c53364582174f5760: !RoverDeliverySim.TileServer,RoverDeliverySim.Game
                         Id: 7537d606-1912-4ec1-9cd6-ffb0b0b1aad0
-                    bb0de309fc856569005ee3e26600f3cd: !RoverDeliverySim.SaveMapImageScript,RoverDeliverySim.Game
+                    6c258eae4f0a9ad24d312af557cc04ee: !RoverDeliverySim.SaveMapImageScript,RoverDeliverySim.Game
                         Id: b273f6ae-5766-4134-89be-5769442b586c
                         RenderTargetAsset: a02651e2-abce-4042-8600-8b53d40f4d1c:Models/Textures/RenderTexture
         -   Entity:

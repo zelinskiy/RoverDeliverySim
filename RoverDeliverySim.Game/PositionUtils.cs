@@ -7,7 +7,8 @@ namespace RoverDeliverySim;
 
 internal static class PositionUtils
 {
-    public static readonly (double Lat, double Lon) SceneOriginGPS = (51.1079, 17.0385);
+    //public static readonly (double Lat, double Lon) SceneOriginGPS = (51.1079, 17.0385);
+    public static readonly (double Lat, double Lon) SceneOriginGPS = (51.1041661, 16.9631966);
     public static readonly (double Lat, double Lon, double Alt) SceneOriginGPS3 = (SceneOriginGPS.Lat, SceneOriginGPS.Lon, 118.0);
     public static readonly (double Lat, double Lon, double Alt) SceneOriginMercator3;
     public static readonly (double Lat, double Lon) SceneOriginMercator;
@@ -63,5 +64,12 @@ internal static class PositionUtils
             altMm,
             relAltMm
         );
+    }
+
+    public static Vector2 StrideFromGeoJson(double lat, double lon)
+    {
+        var X = (float)((lon - SceneOriginGPS.Lon) * MetersPerDeg.Lon);
+        var Z = (float)(-(lat - SceneOriginGPS.Lat) * MetersPerDeg.Lat);
+        return new Vector2(X, Z);
     }
 }

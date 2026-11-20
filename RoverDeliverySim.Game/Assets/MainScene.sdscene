@@ -18,6 +18,7 @@ Hierarchy:
         - ref!! fac5244a-aa86-4c83-897a-ab1e895ab459
         - ref!! 507b2137-ed8b-4a41-9d04-cf93bd62f29e
         - ref!! 71677f62-7d5d-4ec1-9d5d-ab26722bfd54
+        - ref!! 288c34e1-5199-4d84-a6f1-197961a0757b
     Parts:
         -   Entity:
                 Id: 0353d0ee-edb8-4066-9d71-b77cb03135aa
@@ -44,14 +45,44 @@ Hierarchy:
                                 ComputeTransmittance: false
                                 BiasParameters: {}
                         Intensity: 4.0
+        -   Folder: null
+            Entity:
+                Id: 05363978-e09f-4e24-b7b4-abedefa0d0b7
+                Name: Road
+                Components:
+                    1e1f1d30b472ad26986f05c39120baf9: !TransformComponent
+                        Id: 7befffd8-3ac9-4e36-94ff-17d68b97c804
+                        Position: {X: 6.0, Y: 0.0, Z: -7.5}
+                        Rotation: {X: 0.0, Y: 0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 12.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    b547bc4fbd592405714cb334af4fc699: !ModelComponent
+                        Id: 3ff31352-c41d-4ca5-9f99-236dab7c0689
+                        Model: aec8dd79-613c-4abd-a031-94de33f9cffc:Models/Buildings/road-straight
+                        Materials: {}
+        -   Folder: null
+            Entity:
+                Id: 101aded8-27ec-4de8-bbe5-fd00ad118ccb
+                Name: Crossroad
+                Components:
+                    e411888f6130a225d05723882c680a33: !TransformComponent
+                        Id: db8b9f6e-19fb-4e44-9b79-d805786461f5
+                        Position: {X: 6.0, Y: 0.0, Z: 0.5}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 4.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    43f35325cc7db31ecbabe4f49d06c896: !ModelComponent
+                        Id: f3caf462-b29c-4332-a6d2-3644e38dfe17
+                        Model: ff5f3f88-f4d1-4b26-ae0c-27d6a56be34d:Models/Buildings/road-crossroad-path
+                        Materials: {}
         -   Entity:
                 Id: 125e521d-89dc-4bbb-aa8f-228fc185d6f8
                 Name: Rover
                 Components:
                     c3625580c758a0979dc5849cce44bc3b: !TransformComponent
                         Id: 3e81b89a-2791-4176-ad17-a7af5e125732
-                        Position: {X: 0.0, Y: 0.01, Z: 0.0}
-                        Rotation: {X: 0.0, Y: 0.70710677, Z: 0.0, W: 0.70710677}
+                        Position: {X: -8.507175, Y: 0.01, Z: -1.9123194}
+                        Rotation: {X: 0.0, Y: 0.012704097, Z: 0.0, W: 0.9999193}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children:
                             a9ad407cb0d60d6c5254a42dfa82276f: ref!! 8991e41d-7d83-40c5-9e47-ce92f89637f8
@@ -114,6 +145,39 @@ Hierarchy:
                             54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
         -   Folder: null
             Entity:
+                Id: 1fb3d42a-c777-4d91-9653-0c9a48680e36
+                Name: Crossroad
+                Components:
+                    e411888f6130a225d05723882c680a33: !TransformComponent
+                        Id: de2aabe0-d71c-4572-aca8-c387d4f07cb8
+                        Position: {X: 6.0, Y: 0.0, Z: -15.5}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 4.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    43f35325cc7db31ecbabe4f49d06c896: !ModelComponent
+                        Id: a9ce6c70-adf9-4117-b4e4-a1e18388ad57
+                        Model: ff5f3f88-f4d1-4b26-ae0c-27d6a56be34d:Models/Buildings/road-crossroad-path
+                        Materials: {}
+        -   Entity:
+                Id: 288c34e1-5199-4d84-a6f1-197961a0757b
+                Name: RoadNetwork
+                Components:
+                    a3554d8c1572126b0514e5ec92cb9901: !TransformComponent
+                        Id: 01724a43-b70c-4912-9b1a-f9a0b9ba926a
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children:
+                            9ab573961645425604ec2181d1d0705c: ref!! 562f1f07-be27-4761-a8fb-5d999e60680d
+                            be05398ad7143ece9a66be63bd124cb1: ref!! 7befffd8-3ac9-4e36-94ff-17d68b97c804
+                            14c2a3a081d67b835949dde2ffb82ff6: ref!! 3b7c884e-9897-44da-9b04-833f7db082ce
+                            46f430483c772a53f8007611526bd2f4: ref!! c8237ee5-f022-40d9-9927-ea20579144b7
+                            dab6c097c5c9d3b84b3ca4f737c5ee8b: ref!! 782aba81-2dca-4898-954b-42d18ab73167
+                            896590dbadc77b151eb261398cf814d6: ref!! de2aabe0-d71c-4572-aca8-c387d4f07cb8
+                            20e7604dc1b3a8a99e4c497ddf3e60e0: ref!! cab444e7-dba7-43c0-a750-d1e0ba5c1cbf
+                            caf96059d1f323ed7e7fb40f2b6cf651: ref!! db8b9f6e-19fb-4e44-9b79-d805786461f5
+        -   Folder: null
+            Entity:
                 Id: 2d507826-7be8-46c5-afe4-6e72f38e1bfc
                 Name: House
                 Components:
@@ -126,6 +190,20 @@ Hierarchy:
                     efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
                         Id: f94e9806-3f65-4fb9-89bd-61d7d51ada0c
                         Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
+                        Materials: {}
+        -   Entity:
+                Id: 4533f91a-c067-4349-9e67-6da8d4cb2328
+                Name: Crossroad
+                Components:
+                    e411888f6130a225d05723882c680a33: !TransformComponent
+                        Id: 782aba81-2dca-4898-954b-42d18ab73167
+                        Position: {X: -10.0, Y: 0.0, Z: -15.5}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 4.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    43f35325cc7db31ecbabe4f49d06c896: !ModelComponent
+                        Id: b477d98e-c354-4afd-b1a7-66ae9d0f827a
+                        Model: ff5f3f88-f4d1-4b26-ae0c-27d6a56be34d:Models/Buildings/road-crossroad-path
                         Materials: {}
         -   Entity:
                 Id: 46938bba-05fc-46d8-938e-3ee80d2cc5d5
@@ -186,6 +264,34 @@ Hierarchy:
                             e341da901005e49e7108f03895aa4fbc: ref!! 93005a95-d2d4-4c31-a325-11b761c5809f
                             35ca93934679d7ddf9ee85661d85f344: ref!! 517b1cf0-0e8f-4080-8331-f58eeda88b50
         -   Entity:
+                Id: 5c110b8f-7a5a-42ce-a260-184743770d54
+                Name: Crossroad
+                Components:
+                    e411888f6130a225d05723882c680a33: !TransformComponent
+                        Id: cab444e7-dba7-43c0-a750-d1e0ba5c1cbf
+                        Position: {X: -10.0, Y: 0.0, Z: 0.5}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 4.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    43f35325cc7db31ecbabe4f49d06c896: !ModelComponent
+                        Id: 6c58fcd9-3ed6-4e2e-a871-73b8ce148acb
+                        Model: ff5f3f88-f4d1-4b26-ae0c-27d6a56be34d:Models/Buildings/road-crossroad-path
+                        Materials: {}
+        -   Entity:
+                Id: 6f2ebb1d-a56a-4daa-bbc0-50e896d811c0
+                Name: Road
+                Components:
+                    1e1f1d30b472ad26986f05c39120baf9: !TransformComponent
+                        Id: 562f1f07-be27-4761-a8fb-5d999e60680d
+                        Position: {X: -10.0, Y: 0.0, Z: -7.5}
+                        Rotation: {X: 0.0, Y: 0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 12.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    b547bc4fbd592405714cb334af4fc699: !ModelComponent
+                        Id: 728f1380-61f5-45d0-b520-996b79d56380
+                        Model: aec8dd79-613c-4abd-a031-94de33f9cffc:Models/Buildings/road-straight
+                        Materials: {}
+        -   Entity:
                 Id: 71677f62-7d5d-4ec1-9d5d-ab26722bfd54
                 Name: Neighborhood
                 Components:
@@ -244,6 +350,21 @@ Hierarchy:
                         IsShadowCaster: false
                         Materials:
                             54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
+        -   Folder: null
+            Entity:
+                Id: a923bc95-a8f5-4149-b3a3-e4faa1d6b2fa
+                Name: Road
+                Components:
+                    1e1f1d30b472ad26986f05c39120baf9: !TransformComponent
+                        Id: 3b7c884e-9897-44da-9b04-833f7db082ce
+                        Position: {X: -2.0, Y: 0.0, Z: 0.5}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 12.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    b547bc4fbd592405714cb334af4fc699: !ModelComponent
+                        Id: 34b7faf4-47f3-4483-b399-8868ee641e0d
+                        Model: aec8dd79-613c-4abd-a031-94de33f9cffc:Models/Buildings/road-straight
+                        Materials: {}
         -   Entity:
                 Id: af112fa1-94b6-47b1-ad49-9eb0ca1fd288
                 Name: Skybox
@@ -374,3 +495,18 @@ Hierarchy:
                         IsShadowCaster: false
                         Materials:
                             54f3e9cb379b3ba90c917dba2ce2ccbd~0: 25bc43b8-6ebe-48c7-9d7a-43d9a206d0a0:Models/Materials/ClickPointMaterial
+        -   Folder: null
+            Entity:
+                Id: ff27d959-af06-42ad-86f9-134c652a9547
+                Name: Road
+                Components:
+                    1e1f1d30b472ad26986f05c39120baf9: !TransformComponent
+                        Id: c8237ee5-f022-40d9-9927-ea20579144b7
+                        Position: {X: -2.0, Y: 0.0, Z: -15.5}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 12.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    b547bc4fbd592405714cb334af4fc699: !ModelComponent
+                        Id: efa55241-01f6-46d8-bdd9-d6876906710d
+                        Model: aec8dd79-613c-4abd-a031-94de33f9cffc:Models/Buildings/road-straight
+                        Materials: {}

@@ -1,0 +1,15 @@
+!Model
+Id: aec8dd79-613c-4abd-a031-94de33f9cffc
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Source: !file ../../../Resources/Models/Buildings/road-straight.glb
+Skeleton: null
+PivotPosition: {X: 0.0, Y: 0.0, Z: 0.0}
+Materials:
+    1149c6c30188ec37d5af8e05bc1218cf:
+        Name: colormap
+        MaterialInstance:
+            Material: 9c184325-c8e2-4467-ad2b-8be983a8aeca:Models/Materials/Road
+Modifiers: {}
+~SourceHashes:
+    777256054968e97fececafd6a24d1670~../../../Resources/Models/Buildings/road-straight.glb: bbbc3fb8c15c675ead7d508f49935222

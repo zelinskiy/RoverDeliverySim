@@ -81,8 +81,8 @@ Hierarchy:
                 Components:
                     c3625580c758a0979dc5849cce44bc3b: !TransformComponent
                         Id: 3e81b89a-2791-4176-ad17-a7af5e125732
-                        Position: {X: -8.507175, Y: 0.01, Z: -1.9123194}
-                        Rotation: {X: 0.0, Y: 0.012704097, Z: 0.0, W: 0.9999193}
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.70710677, Z: 0.0, W: 0.70710677}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children:
                             a9ad407cb0d60d6c5254a42dfa82276f: ref!! 8991e41d-7d83-40c5-9e47-ce92f89637f8
@@ -264,6 +264,20 @@ Hierarchy:
                             e341da901005e49e7108f03895aa4fbc: ref!! 93005a95-d2d4-4c31-a325-11b761c5809f
                             35ca93934679d7ddf9ee85661d85f344: ref!! 517b1cf0-0e8f-4080-8331-f58eeda88b50
         -   Entity:
+                Id: 5969da51-a7da-48ed-8b60-f8b1876d86fd
+                Name: GpsRoad
+                Components:
+                    dc6e07220aa295d7936e7a7cbcf528df: !TransformComponent
+                        Id: 0b16f212-f41c-4d93-97cd-7fd3297dd1be
+                        Position: {X: -10.0, Y: 0.025, Z: -3.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 4.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    2b33a8b6669bb25192f1aac6d104f968: !ModelComponent
+                        Id: fb718fda-4d4f-49f7-9a83-722ad5d18a06
+                        Model: 31fac60b-f8ec-439f-a1ad-4633cb39df72:Models/Buildings/GpsRoad
+                        Materials: {}
+        -   Entity:
                 Id: 5c110b8f-7a5a-42ce-a260-184743770d54
                 Name: Crossroad
                 Components:
@@ -302,9 +316,11 @@ Hierarchy:
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children:
                             afa0808c49c04746ceab6d36ff180c72: ref!! c69eb815-6d97-4d6a-ac10-3165a8613175
+                            73b7cde5ee81c7b5a4a16db5fcce05ab: ref!! 0b16f212-f41c-4d93-97cd-7fd3297dd1be
                     9f1d0497c97dde5189bccb2f6be8da34: !RoverDeliverySim.GpsLoader,RoverDeliverySim.Game
                         Id: 52b514d3-a0c2-4f64-a32a-038aaceac4d7
                         BuildingPlaceholerTemplate: ref!! 8c54193e-1eb2-4225-9d98-94faf8b000e6
+                        RoadPlaceholderTemplate: ref!! 5969da51-a7da-48ed-8b60-f8b1876d86fd
                         Camera: ref!! bcdec293-0c01-4bbf-87dd-f8bf083617a1
         -   Entity:
                 Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9

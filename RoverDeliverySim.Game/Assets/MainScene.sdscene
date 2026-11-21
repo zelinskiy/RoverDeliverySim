@@ -176,6 +176,16 @@ Hierarchy:
                             896590dbadc77b151eb261398cf814d6: ref!! de2aabe0-d71c-4572-aca8-c387d4f07cb8
                             20e7604dc1b3a8a99e4c497ddf3e60e0: ref!! cab444e7-dba7-43c0-a750-d1e0ba5c1cbf
                             caf96059d1f323ed7e7fb40f2b6cf651: ref!! db8b9f6e-19fb-4e44-9b79-d805786461f5
+        -   Entity:
+                Id: 2c9ddbe1-b5e3-46fe-a322-3dc78139d843
+                Name: Roads
+                Components:
+                    79d31c6b83c058b5ff831ce80f352ae1: !TransformComponent
+                        Id: 6d1aeff4-b9cb-473f-b308-d2ffe07027c4
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
         -   Folder: null
             Entity:
                 Id: 2d507826-7be8-46c5-afe4-6e72f38e1bfc
@@ -190,6 +200,20 @@ Hierarchy:
                     efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
                         Id: f94e9806-3f65-4fb9-89bd-61d7d51ada0c
                         Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
+                        Materials: {}
+        -   Entity:
+                Id: 34ad8636-0332-4160-9b42-918180e5068c
+                Name: TypicalRoad
+                Components:
+                    1e1f1d30b472ad26986f05c39120baf9: !TransformComponent
+                        Id: 136ab1b8-5152-4659-b3de-bb92953410ba
+                        Position: {X: -10.0, Y: 0.0, Z: 4.5}
+                        Rotation: {X: 0.0, Y: 0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 4.0, Y: 1.0, Z: 4.0}
+                        Children: {}
+                    b547bc4fbd592405714cb334af4fc699: !ModelComponent
+                        Id: bc69374f-9583-4141-a287-b4b1c8b2f600
+                        Model: aec8dd79-613c-4abd-a031-94de33f9cffc:Models/Buildings/road-straight
                         Materials: {}
         -   Entity:
                 Id: 4533f91a-c067-4349-9e67-6da8d4cb2328
@@ -269,7 +293,7 @@ Hierarchy:
                 Components:
                     dc6e07220aa295d7936e7a7cbcf528df: !TransformComponent
                         Id: 0b16f212-f41c-4d93-97cd-7fd3297dd1be
-                        Position: {X: -10.0, Y: 0.025, Z: -3.0}
+                        Position: {X: -10.0, Y: 0.025, Z: 11.251204}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 4.0, Y: 1.0, Z: 4.0}
                         Children: {}
@@ -315,12 +339,16 @@ Hierarchy:
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 1.0, Y: 1.0, Z: 1.0}
                         Children:
-                            afa0808c49c04746ceab6d36ff180c72: ref!! c69eb815-6d97-4d6a-ac10-3165a8613175
-                            73b7cde5ee81c7b5a4a16db5fcce05ab: ref!! 0b16f212-f41c-4d93-97cd-7fd3297dd1be
+                            4cf66189e5dfcfa2cea253ed3a90f23b: ref!! 78faa154-7960-4adc-85d6-fce7b9a6e296
+                            43b49f9266cf36c5b303ba83f45aaa38: ref!! 136ab1b8-5152-4659-b3de-bb92953410ba
+                            dc31244410c454f24c63b69f0b873d3a: ref!! 6d1aeff4-b9cb-473f-b308-d2ffe07027c4
+                            917b3ce44e6e28e2803e8581866c1da5: ref!! 23ef4868-01a2-48e7-b0e6-33a6e61946a8
+                            eef9751d3c28df93bedd2961834bfdf4: ref!! bfe464f8-133d-481b-a8f6-1291385e3f51
                     9f1d0497c97dde5189bccb2f6be8da34: !RoverDeliverySim.GpsLoader,RoverDeliverySim.Game
                         Id: 52b514d3-a0c2-4f64-a32a-038aaceac4d7
-                        BuildingPlaceholerTemplate: ref!! 8c54193e-1eb2-4225-9d98-94faf8b000e6
-                        RoadPlaceholderTemplate: ref!! 5969da51-a7da-48ed-8b60-f8b1876d86fd
+                        BuildingPlaceholerTemplate: ref!! eea1ed7e-72b9-492f-8690-3eb81ded0eda
+                        RoadPlaceholderTemplate: ref!! 34ad8636-0332-4160-9b42-918180e5068c
+                        Neighborhood: ref!! 71677f62-7d5d-4ec1-9d5d-ab26722bfd54
                         Camera: ref!! bcdec293-0c01-4bbf-87dd-f8bf083617a1
         -   Entity:
                 Id: 7fd2de65-77f4-4a0e-91d7-cf00205f0be9
@@ -342,7 +370,7 @@ Hierarchy:
                 Components:
                     1ff4d195d977e5114f07df6dc43ee231: !TransformComponent
                         Id: c69eb815-6d97-4d6a-ac10-3165a8613175
-                        Position: {X: -13.5, Y: 1.0, Z: -3.0}
+                        Position: {X: -13.5, Y: 1.0, Z: 11.251204}
                         Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
                         Scale: {X: 2.0, Y: 2.0, Z: 3.0}
                         Children: {}
@@ -366,6 +394,16 @@ Hierarchy:
                         IsShadowCaster: false
                         Materials:
                             54f3e9cb379b3ba90c917dba2ce2ccbd~0: f0493747-5313-48f6-9e74-bc1731eccee3:Models/Materials/NavPointMaterial
+        -   Entity:
+                Id: a811e7c4-0e31-4300-80fb-7e9e2993b54f
+                Name: Buildings
+                Components:
+                    809990f4a283b4c930b746f1f1ca6b74: !TransformComponent
+                        Id: 23ef4868-01a2-48e7-b0e6-33a6e61946a8
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children: {}
         -   Folder: null
             Entity:
                 Id: a923bc95-a8f5-4149-b3a3-e4faa1d6b2fa
@@ -428,6 +466,18 @@ Hierarchy:
                         MouseRotationSpeed: {X: 1.0, Y: 1.0}
                         TouchRotationSpeed: {X: 1.0, Y: 0.7}
         -   Entity:
+                Id: cf6448a3-f548-42d1-8c5f-b239211ec736
+                Name: Placeholders
+                Components:
+                    d0afe2a9f98837169cb0db39905a2d30: !TransformComponent
+                        Id: bfe464f8-133d-481b-a8f6-1291385e3f51
+                        Position: {X: 0.0, Y: 0.0, Z: 0.0}
+                        Rotation: {X: 0.0, Y: 0.0, Z: 0.0, W: 1.0}
+                        Scale: {X: 1.0, Y: 1.0, Z: 1.0}
+                        Children:
+                            2628b87dda91ae74e95a340d9ac2cde0: ref!! c69eb815-6d97-4d6a-ac10-3165a8613175
+                            66e125b205e4eb6c3c678c04ce18971f: ref!! 0b16f212-f41c-4d93-97cd-7fd3297dd1be
+        -   Entity:
                 Id: ddcfa817-d170-4991-8257-5292ceda03f1
                 Name: MapViewCamera
                 Components:
@@ -463,6 +513,20 @@ Hierarchy:
                     3953b00c360313da51b413bde95e8125: !ModelComponent
                         Id: 5b560ea4-c44f-4d86-815c-a632a19ea5ee
                         Model: 2a28c0d0-8a7c-434e-93ba-47045e557e29:Models/Buildings/building-h
+                        Materials: {}
+        -   Entity:
+                Id: eea1ed7e-72b9-492f-8690-3eb81ded0eda
+                Name: TypicalHouse
+                Components:
+                    ed91a5d67597d04d95a8b51e22e5db65: !TransformComponent
+                        Id: 78faa154-7960-4adc-85d6-fce7b9a6e296
+                        Position: {X: -13.39603, Y: 0.0, Z: 4.0}
+                        Rotation: {X: -0.0, Y: -0.70710677, Z: 0.0, W: 0.70710677}
+                        Scale: {X: 2.0, Y: 2.0, Z: 2.0}
+                        Children: {}
+                    efaa330fdd8af3bcbfd57afb51ecda05: !ModelComponent
+                        Id: 8e5c2e79-4692-42e2-a5d3-fa9b33f0f79e
+                        Model: 7f701b2c-cca0-4476-bf91-ed7fd1a8a5d7:Models/Buildings/building-type-e
                         Materials: {}
         -   Folder: null
             Entity:

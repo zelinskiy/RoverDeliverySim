@@ -59,7 +59,7 @@ public class RoverController : SyncScript
         NavNetworkPoints = NavNetwork.GetChildren().ToList();
         if (NavNetworkPoints.Count < 2)
         {
-            throw new ArgumentException("Navigation Network shall have at least 2 points");
+            throw new ArgumentException("Navigation Network should have at least 2 points");
         }
         MissionBusAdapter = Entity.Get<RoverMavLinkConnection>().MissionBusAdapter;
         MissionBusAdapter.FromConnection.Subscribe(ConnectionMessageHandler);

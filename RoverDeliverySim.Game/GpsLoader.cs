@@ -1,4 +1,5 @@
-﻿using Stride.Core.Mathematics;
+﻿using Stride.Core;
+using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Input;
 using Stride.Rendering.Lights;
@@ -16,20 +17,20 @@ namespace RoverDeliverySim;
 
 public class GpsLoader : AsyncScript
 {
-    [DataMember]
     public (double Lat, double Lon) GpsOrigin { get; } = (51.1041661, 16.9631966);
-    public const float Scale = 1f;
+    public const float Scale = .5f;
     public const float RoadSetback = 4f; // in real meters
     private const float MaxRoadDistance = 40f; // in real meters 
-    private readonly float BuildingsYaw = MathUtil.DegreesToRadians(90);
+    private readonly float BuildingsYaw = MathUtil.DegreesToRadians(180);
     public Entity BuildingPlaceholerTemplate;
     public Entity RoadPlaceholderTemplate;
+    public Entity Neighborhood;
     public Entity Camera;
 
     // Either road or building
     private sealed record GeoElement(
-        long Id, 
-        Dictionary<string, string> Tags, 
+        long Id,
+        Dictionary<string, string> Tags,
         List<(double Lat, double Lon)> Geometry
     );
 
@@ -42,25 +43,32 @@ public class GpsLoader : AsyncScript
     // TODO: check this list
     private static readonly HashSet<string> DrivableHighways = new()
     {
-        "motorway", 
-        "trunk", 
-        "primary", 
-        "secondary", 
+        "motorway",
+        "trunk",
+        "primary",
+        "secondary",
         "tertiary",
-        "unclassified", 
-        "residential", 
-        "living_street", 
+        "unclassified",
+        "residential",
+        "living_street",
         "service",
     };
 
     public override async Task Execute()
     {
-        var elements = await LoadGeoJson("Data/muchobor.json");
+        var elements = await LoadGeoJson("Data/muchobor.map.json");
         var roads = LoadRoads(elements);
         LoadBuildings(elements, roads);
 
         while (Game.IsRunning)
         {
+            if (Input.IsKeyDown(Keys.F3))
+            {
+                var pos = Camera.Transform.Position;
+                var rot = Camera.Transform.Rotation;
+                Log.Warning($"Camera position: {pos.X}:{pos.Y}:{pos.Z}");
+                Log.Warning($"Camera rotation: {rot.X}:{rot.Y}:{rot.Z}");
+            }
             // Do stuff every new frame
             await Script.NextFrame();
         }
@@ -115,6 +123,7 @@ public class GpsLoader : AsyncScript
     private List<RoadSegment> LoadRoads(List<GeoElement> elements)
     {
         var modelBB = RoadPlaceholderTemplate.Get<ModelComponent>().Model.BoundingBox;
+        var roadsRoot = Neighborhood.GetChildren().First(e => e.Name == "Roads");
         var roadSize = modelBB.Maximum - modelBB.Minimum;
         //var roadSize = RoadPlaceholderTemplate.Transform.Scale.XZ();
         var segments = new List<RoadSegment>();
@@ -143,7 +152,7 @@ public class GpsLoader : AsyncScript
                 // Local +X (the stretched axis) must point along the segment.
                 piece.Transform.Rotation = Quaternion.RotationY(MathF.Atan2(-d.Y, d.X));
                 piece.Transform.Scale.X = length / roadSize.X;
-                //piece.Transform.Scale.Z = width / roadSize.Y;                
+                //piece.Transform.Scale.Z = width / roadSize.Y;
                 Entity.Scene.Entities.Add(piece);
 
                 segments.Add(new RoadSegment(a, b, piece.Transform.Scale.Z / 2));
@@ -155,10 +164,10 @@ public class GpsLoader : AsyncScript
     }
 
     private static bool TryFindNearestRoad(
-        List<RoadSegment> roads, 
+        List<RoadSegment> roads,
         Vector2 p,
-        out RoadSegment best, 
-        out Vector2 bestPoint, 
+        out RoadSegment best,
+        out Vector2 bestPoint,
         out float bestDistance)
     {
         best = default;
@@ -191,27 +200,30 @@ public class GpsLoader : AsyncScript
         Camera.Transform.Rotation = Quaternion.RotationX(-MathF.PI / 2);
     }
 
-    private List<Entity> LoadBuildings(List<GeoElement> elements, List<RoadSegment> roads)
+    private void LoadBuildings(List<GeoElement> elements, List<RoadSegment> roads)
     {
-        var MaxBuildings = 1000;
+        var maxBuildings = 10;
         var maxDistance = MaxRoadDistance * Scale;
         var setback = RoadSetback * Scale;
-        List<Entity> placedBuildings = [];
+        var modelBB = RoadPlaceholderTemplate.Get<ModelComponent>().Model.BoundingBox;
+        var buildingSize = modelBB.Maximum - modelBB.Minimum;
+        var buildingsRoot = Neighborhood.GetChildren().First(e => e.Name == "Buildings");
 
-        foreach (var way in elements)
+        var buildings = elements
+            .Where(e => e.Tags.ContainsKey("building") && e.Tags.ContainsKey("addr:housenumber"))
+            .ToList();
+        foreach (var building in buildings)
         {
-            if (!way.Tags.ContainsKey("building")) continue;
-
             // Closed ways repeat the first node at the end.
-            var corners = way.Geometry;
-            var n = corners.Count;
-            if (n > 1 && corners[0] == corners[n - 1]) n--;
-            if (n < 3) continue;
+            var corners = building.Geometry;
+            if (corners.Last() == corners.First())
+            {
+                corners.RemoveAt(corners.Count - 1);
+            }
+            if (corners.Count < 3) continue;
 
-            var center = Vector2.Zero;
-            for (var i = 0; i < n; i++)
-                center += ToScene(corners[i].Lat, corners[i].Lon);
-            center /= n;
+            var points = corners.Select(p => ToScene(p.Lat, p.Lon));
+            Vector2 center = points.Aggregate((a, b) => a + b) / points.Count();
 
             var yaw = 0f;
             if (TryFindNearestRoad(roads, center, out var road, out var closest, out var distance)
@@ -226,17 +238,26 @@ public class GpsLoader : AsyncScript
                 yaw = MathF.Atan2(toRoad.X, toRoad.Y) + BuildingsYaw;
             }
 
-            var building = BuildingPlaceholerTemplate.Clone();
-            building.Transform.Position.X = center.X;
-            building.Transform.Position.Z = center.Y;
-            building.Transform.Rotation = Quaternion.RotationY(yaw);
-            Entity.Scene.Entities.Add(building);
-            placedBuildings.Add(building);
-            if (placedBuildings.Count > MaxBuildings) break;
-        }
+            var entity = BuildingPlaceholerTemplate.Clone();
+            entity.Transform.Position.X = center.X;
+            entity.Transform.Position.Z = center.Y;
+            entity.Transform.Rotation = Quaternion.RotationY(yaw);
 
-        Log.Info($"Loaded {placedBuildings.Count} buildings");
-        return placedBuildings;
+            // NB: only use these for scaling, never use them for coordinates,
+            // since we're moving our buildings towards the road.
+            //var min = new Vector2(points.Min(p => p.X), points.Min(p => p.Y));
+            //var max = new Vector2(points.Max(p => p.X), points.Max(p => p.Y));
+            //building.Transform.Scale.X = max.X - min.X;
+            //building.Transform.Scale.Z = max.Y - min.Y;
+
+            //Entity.Scene.Entities.Add(building);
+            buildingsRoot.AddChild(entity);
+            if (buildingsRoot.Count() >= maxBuildings)
+            {
+                Log.Warning($"Too many buildings, skipped last {buildings.Count - buildingsRoot.Count()}");
+            }
+        }
+        Log.Info($"Loaded {buildingsRoot.Count()} buildings");
     }
 
 

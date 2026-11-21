@@ -1,0 +1,7 @@
+!Texture
+Id: 49a1c2aa-649e-4123-ac1e-dc5399e7f98b
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Source: !file ../../../../../../../../Downloads/GLB format/Textures/colormap.png
+Type: !ColorTextureType
+    ColorKeyColor: {R: 255, G: 0, B: 255, A: 255}

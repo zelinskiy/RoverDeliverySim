@@ -1,0 +1,15 @@
+!Model
+Id: ff5f3f88-f4d1-4b26-ae0c-27d6a56be34d
+SerializedVersion: {Stride: 2.0.0.0}
+Tags: []
+Source: !file ../../../Resources/Models/Buildings/road-crossroad-path.glb
+Skeleton: null
+PivotPosition: {X: 0.0, Y: 0.0, Z: 0.0}
+Materials:
+    8fae2ebe63f16bc8ed58588e7b25d3f8:
+        Name: colormap
+        MaterialInstance:
+            Material: 9c184325-c8e2-4467-ad2b-8be983a8aeca:Models/Materials/Road
+Modifiers: {}
+~SourceHashes:
+    f1201fde34847156f7fb515d12cae3d1~../../../Resources/Models/Buildings/road-crossroad-path.glb: a8ddc35421db61c8d1f5a5d42e37a0fb

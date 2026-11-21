@@ -1,4 +1,9 @@
-﻿using Stride.Core;
+﻿using NetTopologySuite.Features;
+using NetTopologySuite.Geometries;
+using NetTopologySuite.IO.Converters;
+using System.Text.Json;
+using NtsPoint = NetTopologySuite.Geometries.Point;
+using Stride.Core;
 using Stride.Core.Mathematics;
 using Stride.Engine;
 using Stride.Input;
@@ -13,6 +18,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
+
 namespace RoverDeliverySim;
 
 public class GpsLoader : AsyncScript
@@ -20,19 +26,36 @@ public class GpsLoader : AsyncScript
     public (double Lat, double Lon) GpsOrigin { get; } = (51.1041661, 16.9631966);
     public const float Scale = .5f;
     public const float RoadSetback = 4f; // in real meters
-    private const float MaxRoadDistance = 40f; // in real meters 
+    private const float MaxRoadDistance = 40f; // in real meters
+    public const float RoadWidth = 6f; // in real meters
     private readonly float BuildingsYaw = MathUtil.DegreesToRadians(180);
     public Entity BuildingPlaceholerTemplate;
     public Entity RoadPlaceholderTemplate;
     public Entity Neighborhood;
     public Entity Camera;
 
-    // Either road or building
-    private sealed record GeoElement(
-        long Id,
-        Dictionary<string, string> Tags,
-        List<(double Lat, double Lon)> Geometry
-    );
+    private sealed record Address(string StreetName, string StreetId, string PostalCode, string HouseNumber);
+
+    private abstract record GeoFeature
+    {
+        public required string Id { get; init; }
+        public required Geometry Geometry { get; init; }
+    }
+
+    private sealed record BuildingGeoFeature : GeoFeature
+    {
+        public required IReadOnlyList<Address> Addresses { get; init; }
+    }
+
+    private sealed record AddressGeoFeature : GeoFeature
+    {
+        public required Address Address { get; init; }
+    }
+
+    private sealed record StreetGeoFeature : GeoFeature
+    {
+        public required string StreetName { get; init; }
+    }
 
     private readonly record struct RoadSegment(
         Vector2 Begin, // XZ
@@ -40,65 +63,87 @@ public class GpsLoader : AsyncScript
         float HalfWidth
     );
 
-    // TODO: check this list
-    private static readonly HashSet<string> DrivableHighways = new()
-    {
-        "motorway",
-        "trunk",
-        "primary",
-        "secondary",
-        "tertiary",
-        "unclassified",
-        "residential",
-        "living_street",
-        "service",
-    };
-
     public override async Task Execute()
     {
         var elements = await LoadGeoJson("Data/muchobor.map.json");
         var roads = LoadRoads(elements);
         LoadBuildings(elements, roads);
 
+        Camera.Transform.Rotation = Quaternion.RotationYawPitchRoll(
+            0.06039264f, -0.51602393f, 0.006604771f
+        );
+        Camera.Transform.Position = new Vector3(200, 150, 375);
+
         while (Game.IsRunning)
         {
             if (Input.IsKeyDown(Keys.F3))
             {
-                var pos = Camera.Transform.Position;
-                var rot = Camera.Transform.Rotation;
-                Log.Warning($"Camera position: {pos.X}:{pos.Y}:{pos.Z}");
-                Log.Warning($"Camera rotation: {rot.X}:{rot.Y}:{rot.Z}");
+                Log.Warning($"Camera position: {Camera.Transform.Position}");
+                Log.Warning($"Camera rotation: {Camera.Transform.Rotation.YawPitchRoll}");
             }
-            // Do stuff every new frame
             await Script.NextFrame();
         }
     }
 
-    private static async Task<List<GeoElement>> LoadGeoJson(string path)
+    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
+
+    private static JsonSerializerOptions CreateJsonOptions()
     {
-        var data = await File.ReadAllBytesAsync(path);
-        using var doc = JsonDocument.Parse(data);
+        var o = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower };
+        o.Converters.Add(new GeoJsonConverterFactory());
+        return o;
+    }
 
-        var elements = new List<GeoElement>();
-        foreach (var el in doc.RootElement.GetProperty("elements").EnumerateArray())
+    private static async Task<List<GeoFeature>> LoadGeoJson(string path)
+    {
+        await using var stream = File.OpenRead(path);
+        var collection = await JsonSerializer.DeserializeAsync<FeatureCollection>(stream, JsonOptions)
+            ?? throw new InvalidDataException($"{path} is not a FeatureCollection");
+        return collection.Select(ToGeoFeature).ToList();
+    }
+
+    // Attribute values come back as boxed objects; round-tripping through JsonElement
+    // gives typed access whatever the boxed type is.
+    private static T? Attr<T>(IFeature f, string name) =>
+        f.Attributes.Exists(name)
+            ? JsonSerializer.SerializeToElement(f.Attributes[name], JsonOptions).Deserialize<T>(JsonOptions)
+            : default;
+
+    private static GeoFeature ToGeoFeature(IFeature f)
+    {
+        var kind = Attr<string>(f, "kind");
+        return kind switch
         {
-            if (el.GetProperty("type").GetString() != "way") continue;
-            if (!el.TryGetProperty("geometry", out var geometry)) continue;
+            "building" => new BuildingGeoFeature
+            {
+                Id = Attr<long>(f, "osm_id").ToString(CultureInfo.InvariantCulture),
+                Geometry = f.Geometry,
+                Addresses = Attr<List<Address>>(f, "addresses") ?? [],
+            },
+            "street" => new StreetGeoFeature
+            {
+                Id = Attr<string>(f, "id")!,
+                Geometry = f.Geometry,
+                StreetName = Attr<string>(f, "name")!,
+            },
+            "address" => ToAddressFeature(f),
+            _ => throw new InvalidDataException($"Unknown feature kind '{kind}'")
+        };
+    }
 
-            var tags = el.TryGetProperty("tags", out var t)
-                ? t.EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetString() ?? "")
-                : [];
-
-            var points = geometry.EnumerateArray()
-                .Where(p => p.ValueKind == JsonValueKind.Object)
-                .Select(p => (Lat: p.GetProperty("lat").GetDouble(), Lon: p.GetProperty("lon").GetDouble()))
-                .ToList();
-            if (points.Count < 2) continue;
-
-            elements.Add(new GeoElement(el.GetProperty("id").GetInt64(), tags, points));
-        }
-
-        return elements;
+    private static AddressGeoFeature ToAddressFeature(IFeature f)
+    {
+        var address = new Address(
+            Attr<string>(f, "street")!,
+            Attr<string>(f, "street_id")!,
+            Attr<string>(f, "postal_code")!,
+            Attr<string>(f, "house_number")!);
+        return new AddressGeoFeature
+        {
+            Id = $"{address.StreetId}:{address.HouseNumber}",
+            Geometry = f.Geometry,
+            Address = address,
+        };
     }
 
     private Vector2 ToScene(double lat, double lon)
@@ -107,60 +152,99 @@ public class GpsLoader : AsyncScript
         return new Vector2(x, z) * Scale;
     }
 
-    // Real-world road width in metres: explicit "width" tag, else lanes * 3 m, else 6 m.
-    private static float RoadWidthMeters(Dictionary<string, string> tags)
+    // Y = lat, X = lon
+    private Vector2 ToScene(Coordinate c) => ToScene(c.Y, c.X);
+
+    private static IEnumerable<Coordinate[]> FlattenPolyline(Geometry g) => g switch
     {
-        if (tags.TryGetValue("width", out var w) &&
-            float.TryParse(w, NumberStyles.Float, CultureInfo.InvariantCulture, out var width))
-            return width;
+        LineString l => [l.Coordinates],
+        MultiLineString m => m.Geometries.Select(x => x.Coordinates),
+        _ => throw new InvalidDataException($"Expected a line geometry, got {g.GeometryType}")
+    };
 
-        if (tags.TryGetValue("lanes", out var l) && int.TryParse(l, out var lanes))
-            return lanes * 3f;
-
-        return 6f;
+    private Vector2 Centroid(Polygon footprint)
+    {
+        // NTS rings are closed (first == last), drop the duplicate.
+        var pts = footprint.ExteriorRing.Coordinates[..^1].Select(ToScene).ToList();
+        return pts.Aggregate((a, b) => a + b) / pts.Count;
     }
 
-    private List<RoadSegment> LoadRoads(List<GeoElement> elements)
+    private static string Label(IEnumerable<Address> addresses) =>
+        string.Join(", ", addresses.Select(a => $"{a.StreetName} {a.HouseNumber}"));
+
+    private void LookAt(Vector2 xz)
+    {
+        var height = Camera.Transform.Position.Y * 5;
+        Camera.Transform.Position = new Vector3(xz.X, height, xz.Y); // Vector2.Y is your world Z
+        Camera.Transform.Rotation = Quaternion.RotationX(-MathF.PI / 2);
+    }
+
+    // Real-world road width in metres: explicit "width" tag, else lanes * 3 m, else 6 m.
+    //private static float RoadWidthMeters(Dictionary<string, string> tags)
+    //{
+    //    if (tags.TryGetValue("width", out var w) &&
+    //        float.TryParse(w, NumberStyles.Float, CultureInfo.InvariantCulture, out var width))
+    //        return width;
+
+    //    if (tags.TryGetValue("lanes", out var l) && int.TryParse(l, out var lanes))
+    //        return lanes * 3f;
+
+    //    return 6f;
+    //}
+
+    private List<RoadSegment> LoadRoads(List<GeoFeature> features)
     {
         var modelBB = RoadPlaceholderTemplate.Get<ModelComponent>().Model.BoundingBox;
-        var roadsRoot = Neighborhood.GetChildren().First(e => e.Name == "Roads");
         var roadSize = modelBB.Maximum - modelBB.Minimum;
-        //var roadSize = RoadPlaceholderTemplate.Transform.Scale.XZ();
+        var roadWidth = RoadWidth * Scale;
         var segments = new List<RoadSegment>();
 
-        foreach (var element in elements)
-        {
-            if (!element.Tags.TryGetValue("highway", out var highway)) continue;
-            if (!DrivableHighways.Contains(highway.Replace("_link", ""))) continue;
-
-            element.Tags.TryGetValue("name", out var roadName);
-
-            //var width = RoadWidthMeters(element.Tags) * Scale;
-            var pts = element.Geometry.Select(g => ToScene(g.Lat, g.Lon)).ToList();
-
-            for (var i = 0; i < pts.Count - 1; i++)
+        foreach (var street in features.OfType<StreetGeoFeature>())
+            foreach (var line in FlattenPolyline(street.Geometry))
             {
-                var a = pts[i];
-                var b = pts[i + 1];
-                var d = b - a;
-                var length = d.Length();
-                if (length < 1e-4f) continue;
+                var pts = line.Select(ToScene).ToList();
 
-                var piece = RoadPlaceholderTemplate.Clone();
-                piece.Transform.Position.X = (a.X + b.X) / 2;
-                piece.Transform.Position.Z = (a.Y + b.Y) / 2;
-                // Local +X (the stretched axis) must point along the segment.
-                piece.Transform.Rotation = Quaternion.RotationY(MathF.Atan2(-d.Y, d.X));
-                piece.Transform.Scale.X = length / roadSize.X;
-                //piece.Transform.Scale.Z = width / roadSize.Y;
-                Entity.Scene.Entities.Add(piece);
+                for (var i = 0; i < pts.Count - 1; i++)
+                {
+                    var a = pts[i];
+                    var b = pts[i + 1];
+                    var d = b - a;
+                    var length = d.Length();
+                    if (length < 1e-4f) continue;
 
-                segments.Add(new RoadSegment(a, b, piece.Transform.Scale.Z / 2));
+                    var piece = RoadPlaceholderTemplate.Clone();
+                    piece.Transform.Position.X = (a.X + b.X) / 2;
+                    piece.Transform.Position.Z = (a.Y + b.Y) / 2;
+                    // Local +X (the stretched axis) must point along the segment.
+                    piece.Transform.Rotation = Quaternion.RotationY(MathF.Atan2(-d.Y, d.X));
+                    piece.Transform.Scale.X = length / roadSize.X;
+                    piece.Transform.Scale.Z = roadWidth / roadSize.Z;
+                    Entity.Scene.Entities.Add(piece);
+
+                    segments.Add(new RoadSegment(a, b, roadWidth / 2));
+                }
+                Log.Info($"Loaded {street.StreetName}");
             }
-            Log.Info($"Loaded {roadName ?? "anonymous"}");
-        }
         Log.Info($"Loaded {segments.Count} road segments");
         return segments;
+    }
+
+    // Buildings that have addresses + standalone address points (no building polygon).
+    private IEnumerable<(string Label, Vector2 Center)> BuildingSites(List<GeoFeature> features)
+    {
+        foreach (var f in features)
+        {
+            switch (f)
+            {
+                // Skip noname buildings like sheds etc.
+                case BuildingGeoFeature { Addresses.Count: > 0 } b:
+                    yield return (Label(b.Addresses), Centroid((Polygon)b.Geometry));
+                    break;
+                case AddressGeoFeature a:
+                    yield return (Label([a.Address]), ToScene(a.Geometry.Coordinate));
+                    break;
+            }
+        }
     }
 
     private static bool TryFindNearestRoad(
@@ -193,45 +277,24 @@ public class GpsLoader : AsyncScript
         return bestDistance < float.MaxValue;
     }
 
-    private void LookAt(Vector2 xz)
-    {
-        var height = Camera.Transform.Position.Y * 5;
-        Camera.Transform.Position = new Vector3(xz.X, height, xz.Y); // Vector2.Y is your world Z
-        Camera.Transform.Rotation = Quaternion.RotationX(-MathF.PI / 2);
-    }
-
-    private void LoadBuildings(List<GeoElement> elements, List<RoadSegment> roads)
+    private void LoadBuildings(List<GeoFeature> features, List<RoadSegment> roads)
     {
         var maxBuildings = 10;
         var maxDistance = MaxRoadDistance * Scale;
         var setback = RoadSetback * Scale;
-        var modelBB = RoadPlaceholderTemplate.Get<ModelComponent>().Model.BoundingBox;
-        var buildingSize = modelBB.Maximum - modelBB.Minimum;
         var buildingsRoot = Neighborhood.GetChildren().First(e => e.Name == "Buildings");
 
-        var buildings = elements
-            .Where(e => e.Tags.ContainsKey("building") && e.Tags.ContainsKey("addr:housenumber"))
-            .ToList();
-        foreach (var building in buildings)
+        foreach (var (label, siteCenter) in BuildingSites(features))
         {
-            // Closed ways repeat the first node at the end.
-            var corners = building.Geometry;
-            if (corners.Last() == corners.First())
-            {
-                corners.RemoveAt(corners.Count - 1);
-            }
-            if (corners.Count < 3) continue;
-
-            var points = corners.Select(p => ToScene(p.Lat, p.Lon));
-            Vector2 center = points.Aggregate((a, b) => a + b) / points.Count();
-
+            var center = siteCenter;
             var yaw = 0f;
             if (TryFindNearestRoad(roads, center, out var road, out var closest, out var distance)
                 && distance <= maxDistance && distance > 1e-4f)
             {
                 var toRoad = (closest - center) / distance;   // unit vector: building -> road
 
-                // Keep the side of the street and the position along it; only change the distance from the centreline.
+                // Keep the side of the street and the position along it;
+                // only change the distance from the centreline.
                 center = closest - toRoad * (road.HalfWidth + setback);
 
                 // Local +Z (plus the model's front offset) points at the road.
@@ -239,6 +302,7 @@ public class GpsLoader : AsyncScript
             }
 
             var entity = BuildingPlaceholerTemplate.Clone();
+            entity.Name = label;
             entity.Transform.Position.X = center.X;
             entity.Transform.Position.Z = center.Y;
             entity.Transform.Rotation = Quaternion.RotationY(yaw);
@@ -250,11 +314,12 @@ public class GpsLoader : AsyncScript
             //building.Transform.Scale.X = max.X - min.X;
             //building.Transform.Scale.Z = max.Y - min.Y;
 
-            //Entity.Scene.Entities.Add(building);
             buildingsRoot.AddChild(entity);
+
             if (buildingsRoot.Count() >= maxBuildings)
             {
-                Log.Warning($"Too many buildings, skipped last {buildings.Count - buildingsRoot.Count()}");
+                Log.Warning($"Reached maxBuildings ({maxBuildings}), stopping");
+                break;
             }
         }
         Log.Info($"Loaded {buildingsRoot.Count()} buildings");
